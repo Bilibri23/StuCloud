@@ -1,7 +1,6 @@
 package org.distributed.stumatchdistributed.network;
 
 import jakarta.annotation.PreDestroy;
-import org.distributed.stumatchdistributed.grpc.*;
 import org.distributed.stumatchdistributed.model.ChunkDistribution;
 import org.distributed.stumatchdistributed.model.FileChunk;
 import org.distributed.stumatchdistributed.service.FileDecompositionService;
@@ -87,8 +86,8 @@ public class NetworkController {
                 .build();
 
         // Create blocking stub for synchronous calls
-        NodeServiceGrpc.NodeServiceBlockingStub stub =
-                NodeServiceGrpc.newBlockingStub(channel);
+        org.distributed.stumatchdistributed.grpc.NodeServiceGrpc.NodeServiceBlockingStub stub =
+                org.distributed.stumatchdistributed.grpc.NodeServiceGrpc.newBlockingStub(channel);
 
         // Store connection
         NodeConnection connection = new NodeConnection(nodeId, host, port, channel, stub);
@@ -184,14 +183,14 @@ public class NetworkController {
 
         try {
             // Create gRPC request
-            StoreChunkRequest request = StoreChunkRequest.newBuilder()
+            org.distributed.stumatchdistributed.grpc.StoreChunkRequest request = org.distributed.stumatchdistributed.grpc.StoreChunkRequest.newBuilder()
                     .setChunkId(chunk.getChunkId())
                     .setData(ByteString.copyFrom(chunk.getData()))
                     .setSize(chunk.getSizeBytes())
                     .build();
 
             // Make synchronous gRPC call
-            StoreChunkResponse response = nodeConnection.getStub().storeChunk(request);
+            org.distributed.stumatchdistributed.grpc.StoreChunkResponse response = nodeConnection.getStub().storeChunk(request);
 
             if (!response.getSuccess()) {
                 throw new RuntimeException(
@@ -216,12 +215,12 @@ public class NetworkController {
             NodeConnection connection = nodes.get(nodeId);
             if (connection == null) return;
 
-            StatusRequest request = StatusRequest.newBuilder().build();
-            StatusResponse response = connection.getStub().getStatus(request);
+            org.distributed.stumatchdistributed.grpc.StatusRequest request = org.distributed.stumatchdistributed.grpc.StatusRequest.newBuilder().build();
+            org.distributed.stumatchdistributed.grpc.StatusResponse response = connection.getStub().getStatus(request);
 
             // Convert to domain model
-            com.stumatch.storage.model.NodeStatus status =
-                    new com.stumatch.storage.model.NodeStatus(
+            org.distributed.stumatchdistributed.model.NodeStatus status =
+                    new org.distributed.stumatchdistributed.model.NodeStatus(
                             response.getNodeId(),
                             response.getUsedStorage(),
                             response.getTotalStorage(),

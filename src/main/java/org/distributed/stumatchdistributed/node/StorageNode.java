@@ -115,25 +115,76 @@ public class StorageNode {
     public synchronized boolean storeChunk(String chunkId, byte[] data) {
         long chunkSize = data.length;
 
-        // Business rule: Check capacity
+        // Check capacity
         if (usedStorageBytes + chunkSize > totalStorageBytes) {
             log.warn("❌ Insufficient storage for chunk {} (need {} bytes, available {} bytes)",
                     chunkId, chunkSize, totalStorageBytes - usedStorageBytes);
             return false;
         }
 
-        // Simulate network transfer time
-        simulateTransferDelay(chunkSize);
+        // ENHANCED: Show start time
+        String startTime = java.time.LocalTime.now().format(
+                java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss.SSS")
+        );
+
+        log.info("╔═══════════════════════════════════════════════════════╗");
+        log.info("║  📥 INCOMING CHUNK TRANSFER                           ║");
+        log.info("╠═══════════════════════════════════════════════════════╣");
+        log.info("║  Chunk ID:    {}                    ║", String.format("%-35s", chunkId));
+        log.info("║  Size:        {}                               ║", String.format("%-35s", formatBytes(chunkSize)));
+        log.info("║  Start Time:  {}                          ║", startTime);
+        log.info("╚═══════════════════════════════════════════════════════╝");
+
+        // Simulate transfer with progress
+        long transferTimeMs = (chunkSize * 8 * 1000) / bandwidthBitsPerSecond;
+
+        try {
+            // Show transfer animation
+            log.info("⏳ Transferring... [          ]   0%");
+            Thread.sleep(transferTimeMs / 4);
+            log.info("⏳ Transferring... [██        ]  25%");
+            Thread.sleep(transferTimeMs / 4);
+            log.info("⏳ Transferring... [████      ]  50%");
+            Thread.sleep(transferTimeMs / 4);
+            log.info("⏳ Transferring... [███████   ]  75%");
+            Thread.sleep(transferTimeMs / 4);
+            log.info("⏳ Transferring... [██████████] 100%");
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.error("Transfer interrupted", e);
+            return false;
+        }
 
         // Store the chunk
         storedChunks.put(chunkId, data);
         usedStorageBytes += chunkSize;
 
-        double utilization = (usedStorageBytes * 100.0) / totalStorageBytes;
-        log.info("✅ Stored chunk: {} ({} bytes) - Utilization: {:.2f}%",
-                chunkId, chunkSize, utilization);
+        // ENHANCED: Show end time and duration
+        String endTime = java.time.LocalTime.now().format(
+                java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss.SSS")
+        );
+
+        double utilizationPercent = (usedStorageBytes * 100.0) / totalStorageBytes;
+
+        log.info("╔═══════════════════════════════════════════════════════╗");
+        log.info("║  ✅ TRANSFER COMPLETE                                 ║");
+        log.info("╠═══════════════════════════════════════════════════════╣");
+        log.info("║  End Time:        {}                      ║", endTime);
+        log.info("║  Duration:        {} ms                        ║", String.format("%-26s", transferTimeMs));
+        log.info("║  Total Stored:    {}                         ║", String.format("%-26s", formatBytes(usedStorageBytes)));
+        log.info("║  Utilization:     {}%%                         ║", String.format("%.2f", utilizationPercent));
+        log.info("║  Chunks on Node:  {}                              ║", storedChunks.size());
+        log.info("╚═══════════════════════════════════════════════════════╝");
+        log.info("");
 
         return true;
+    }
+
+    private String formatBytes(long bytes) {
+        if (bytes < 1024) return bytes + " B";
+        if (bytes < 1024 * 1024) return String.format("%.2f KB", bytes / 1024.0);
+        if (bytes < 1024L * 1024 * 1024) return String.format("%.2f MB", bytes / (1024.0 * 1024));
+        return String.format("%.2f GB", bytes / (1024.0 * 1024 * 1024));
     }
 
     /**

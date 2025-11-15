@@ -1,6 +1,6 @@
 package org.distributed.stumatchdistributed.node;
 
-import org.distributed.stumatchdistributed.grpc.*;
+
 import org.distributed.stumatchdistributed.model.NodeStatus;
 import com.google.protobuf.ByteString;
 import io.grpc.stub.StreamObserver;
@@ -21,7 +21,7 @@ import org.slf4j.LoggerFactory;
  * @author Your Name
  * @version 1.0
  */
-public class NodeServiceImpl extends NodeServiceGrpc.NodeServiceImplBase {
+public class NodeServiceImpl extends org.distributed.stumatchdistributed.grpc.NodeServiceGrpc.NodeServiceImplBase {
     private static final Logger log = LoggerFactory.getLogger(NodeServiceImpl.class);
 
     private final StorageNode node;
@@ -47,8 +47,8 @@ public class NodeServiceImpl extends NodeServiceGrpc.NodeServiceImplBase {
      * @param responseObserver Callback for sending response
      */
     @Override
-    public void storeChunk(StoreChunkRequest request,
-                           StreamObserver<StoreChunkResponse> responseObserver) {
+    public void storeChunk(org.distributed.stumatchdistributed.grpc.StoreChunkRequest request,
+                           StreamObserver<org.distributed.stumatchdistributed.grpc.StoreChunkResponse> responseObserver) {
         String chunkId = request.getChunkId();
         byte[] data = request.getData().toByteArray();
 
@@ -59,7 +59,7 @@ public class NodeServiceImpl extends NodeServiceGrpc.NodeServiceImplBase {
             boolean success = node.storeChunk(chunkId, data);
 
             // Build response
-            StoreChunkResponse response = StoreChunkResponse.newBuilder()
+            org.distributed.stumatchdistributed.grpc.StoreChunkResponse response = org.distributed.stumatchdistributed.grpc.StoreChunkResponse.newBuilder()
                     .setSuccess(success)
                     .setMessage(success ? "Chunk stored successfully" : "Insufficient storage space")
                     .build();
@@ -74,7 +74,7 @@ public class NodeServiceImpl extends NodeServiceGrpc.NodeServiceImplBase {
             log.error("Error storing chunk via gRPC", e);
 
             // Send error response
-            StoreChunkResponse errorResponse = StoreChunkResponse.newBuilder()
+            org.distributed.stumatchdistributed.grpc.StoreChunkResponse errorResponse = org.distributed.stumatchdistributed.grpc.StoreChunkResponse.newBuilder()
                     .setSuccess(false)
                     .setMessage("Internal error: " + e.getMessage())
                     .build();
@@ -91,8 +91,8 @@ public class NodeServiceImpl extends NodeServiceGrpc.NodeServiceImplBase {
      * @param responseObserver Callback for sending response with chunk data
      */
     @Override
-    public void retrieveChunk(RetrieveChunkRequest request,
-                              StreamObserver<RetrieveChunkResponse> responseObserver) {
+    public void retrieveChunk(org.distributed.stumatchdistributed.grpc.RetrieveChunkRequest request,
+                              StreamObserver<org.distributed.stumatchdistributed.grpc.RetrieveChunkResponse> responseObserver) {
         String chunkId = request.getChunkId();
 
         log.debug("gRPC request received: retrieveChunk({})", chunkId);
@@ -102,7 +102,7 @@ public class NodeServiceImpl extends NodeServiceGrpc.NodeServiceImplBase {
             byte[] data = node.retrieveChunk(chunkId);
 
             // Build response
-            RetrieveChunkResponse.Builder responseBuilder = RetrieveChunkResponse.newBuilder();
+            org.distributed.stumatchdistributed.grpc.RetrieveChunkResponse.Builder responseBuilder = org.distributed.stumatchdistributed.grpc.RetrieveChunkResponse.newBuilder();
 
             if (data != null) {
                 responseBuilder
@@ -120,7 +120,7 @@ public class NodeServiceImpl extends NodeServiceGrpc.NodeServiceImplBase {
         } catch (Exception e) {
             log.error("Error retrieving chunk via gRPC", e);
 
-            RetrieveChunkResponse errorResponse = RetrieveChunkResponse.newBuilder()
+            org.distributed.stumatchdistributed.grpc.RetrieveChunkResponse errorResponse = org.distributed.stumatchdistributed.grpc.RetrieveChunkResponse.newBuilder()
                     .setSuccess(false)
                     .build();
 
@@ -136,8 +136,8 @@ public class NodeServiceImpl extends NodeServiceGrpc.NodeServiceImplBase {
      * @param responseObserver Callback for sending status response
      */
     @Override
-    public void getStatus(StatusRequest request,
-                          StreamObserver<StatusResponse> responseObserver) {
+    public void getStatus(org.distributed.stumatchdistributed.grpc.StatusRequest request,
+                          StreamObserver<org.distributed.stumatchdistributed.grpc.StatusResponse> responseObserver) {
         log.debug("gRPC request received: getStatus()");
 
         try {
@@ -145,7 +145,7 @@ public class NodeServiceImpl extends NodeServiceGrpc.NodeServiceImplBase {
             NodeStatus status = node.getStatus();
 
             // Convert to protocol buffer format
-            StatusResponse response = StatusResponse.newBuilder()
+            org.distributed.stumatchdistributed.grpc.StatusResponse response = org.distributed.stumatchdistributed.grpc.StatusResponse.newBuilder()
                     .setNodeId(status.getNodeId())
                     .setUsedStorage(status.getUsedStorageBytes())
                     .setTotalStorage(status.getTotalStorageBytes())

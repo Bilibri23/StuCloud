@@ -2,6 +2,7 @@ package org.distributed.stumatchdistributed.network;
 
 
 import io.grpc.ManagedChannel;
+import org.distributed.stumatchdistributed.grpc.NodeServiceGrpc;
 
 /**
  * Represents a connection to a remote storage node.
@@ -44,7 +45,7 @@ public class NodeConnection {
     public String getHost() { return host; }
     public int getPort() { return port; }
     public ManagedChannel getChannel() { return channel; }
-    public NodeServiceGrpc.NodeServiceBlockingStub getStub() { return stub; }
+    public org.distributed.stumatchdistributed.grpc.NodeServiceGrpc.NodeServiceBlockingStub getStub() { return stub; }
 
     /**
      * Returns connection details as string.
