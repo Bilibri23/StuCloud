@@ -1,5 +1,41 @@
-### GET request to example server
-GET https://examples.http-client.intellij.net/get
-    ?generated-in=IntelliJ IDEA
+### Check network status (should show 0 nodes initially)
+GET http://localhost:8081/api/network/status
 
-###
+### Register Node 1
+POST http://localhost:8081/api/network/nodes/register
+Content-Type: application/json
+
+{
+  "nodeId": "node1",
+  "host": "localhost",
+  "port": 50051
+}
+
+### Register Node 2
+POST http://localhost:8081/api/network/nodes/register
+Content-Type: application/json
+
+{
+  "nodeId": "node2",
+  "host": "localhost",
+  "port": 50052
+}
+
+### Register Node 3
+POST http://localhost:8081/api/network/nodes/register
+Content-Type: application/json
+
+{
+  "nodeId": "node3",
+  "host": "localhost",
+  "port": 50053
+}
+
+### Check network status again
+GET http://localhost:8081/api/network/status
+
+### Get list of nodes
+GET http://localhost:8081/api/network/nodes
+
+### Distribute a test file (5MB with 2MB chunks)
+GET http://localhost:8081/api/files/test?sizeMB=5&chunkSize=2
