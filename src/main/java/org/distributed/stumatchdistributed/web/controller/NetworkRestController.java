@@ -1,6 +1,7 @@
 package org.distributed.stumatchdistributed.web.controller;
 
 import org.distributed.stumatchdistributed.network.NetworkController;
+import org.distributed.stumatchdistributed.node.EnhancedNodeStatus;
 import org.distributed.stumatchdistributed.service.StorageMetricsService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -134,5 +135,10 @@ public class NetworkRestController {
             return ResponseEntity.internalServerError()
                     .body(Map.of("error", e.getMessage()));
         }
+    }
+    @GetMapping("/nodes/enhanced/{nodeId}")
+    public ResponseEntity<EnhancedNodeStatus> getEnhancedStatus(@PathVariable String nodeId) {
+        // Return comprehensive status with lifecycle, disk, processes
+        return null;
     }
 }
