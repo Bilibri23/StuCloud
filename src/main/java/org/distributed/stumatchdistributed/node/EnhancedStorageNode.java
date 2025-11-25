@@ -153,6 +153,7 @@ public class EnhancedStorageNode {
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             log.warn("⚠️  Shutting down node {}", nodeId);
             try {
+                log.info("oohh no im shutting down node {}", nodeId);
                 EnhancedStorageNode.this.stop();
             } catch (InterruptedException e) {
                 log.error("Error during shutdown", e);
@@ -167,7 +168,7 @@ public class EnhancedStorageNode {
      * Stops the node gracefully.
      */
     public void stop() throws InterruptedException {
-        log.info("🛑 Stopping node: {}", nodeId);
+        log.info("🛑 Stopping node, im dying: {}", nodeId);
 
         // Stop lifecycle
         lifecycleManager.stop();

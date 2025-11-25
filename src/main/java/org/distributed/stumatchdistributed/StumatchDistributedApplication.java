@@ -22,7 +22,11 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  * @author Your Name
  * @version 1.0
  */
+import org.distributed.stumatchdistributed.config.StorageProperties;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+
 @SpringBootApplication
+@EnableConfigurationProperties(StorageProperties.class)
 public class StumatchDistributedApplication {
     private static final Logger log = LoggerFactory.getLogger(StumatchDistributedApplication.class);
 

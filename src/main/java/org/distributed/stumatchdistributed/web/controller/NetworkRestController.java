@@ -3,6 +3,7 @@ package org.distributed.stumatchdistributed.web.controller;
 import org.distributed.stumatchdistributed.network.NetworkController;
 import org.distributed.stumatchdistributed.node.EnhancedNodeStatus;
 import org.distributed.stumatchdistributed.service.StorageMetricsService;
+import org.distributed.stumatchdistributed.service.NodeManagementService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,15 +37,18 @@ public class NetworkRestController {
 
     private final NetworkController networkController;
     private final StorageMetricsService metricsService;
+    private final NodeManagementService nodeManagementService;
 
     /**
      * Constructor injection for better testability.
      */
     @Autowired
     public NetworkRestController(NetworkController networkController,
-                                 StorageMetricsService metricsService) {
+                                 StorageMetricsService metricsService,
+                                 NodeManagementService nodeManagementService) {
         this.networkController = networkController;
         this.metricsService = metricsService;
+        this.nodeManagementService = nodeManagementService;
     }
 
     /**
@@ -140,5 +144,117 @@ public class NetworkRestController {
     public ResponseEntity<EnhancedNodeStatus> getEnhancedStatus(@PathVariable String nodeId) {
         // Return comprehensive status with lifecycle, disk, processes
         return null;
+    }
+
+    /**
+     * POST /api/network/nodes/start
+     * Starts a new node process.
+     * 
+     * Request body:
+     * {
+     *   "nodeId": "node6",
+     *   "port": 50056,
+     *   "storageGB": 100,
+     *   "ramGB": 8
+     * }
+     */
+    @PostMapping("/nodes/start")
+    public ResponseEntity<?> startNode(@RequestBody Map<String, Object> request) {
+        try {
+            String nodeId = (String) request.get("nodeId");
+            Integer port = request.get("port") != null ? 
+                (request.get("port") instanceof Integer ? (Integer) request.get("port") : 
+                 Integer.parseInt(request.get("port").toString())) : 50051;
+            Integer storageGB = request.get("storageGB") != null ?
+                (request.get("storageGB") instanceof Integer ? (Integer) request.get("storageGB") :
+                 Integer.parseInt(request.get("storageGB").toString())) : 100;
+            Integer ramGB = request.get("ramGB") != null ?
+                (request.get("ramGB") instanceof Integer ? (Integer) request.get("ramGB") :
+                 Integer.parseInt(request.get("ramGB").toString())) : 8;
+
+            log.info("API request: POST /api/network/nodes/start - nodeId={}, port={}, storageGB={}, ramGB={}", 
+                    nodeId, port, storageGB, ramGB);
+
+            if (nodeId == null || nodeId.trim().isEmpty()) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "nodeId is required"));
+            }
+
+            if (nodeManagementService.isNodeRunning(nodeId)) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "Node " + nodeId + " is already running"));
+            }
+
+            boolean started = nodeManagementService.startNode(nodeId, port, storageGB, ramGB);
+            
+            if (started) {
+                return ResponseEntity.ok(Map.of(
+                        "success", true,
+                        "message", "Node started successfully",
+                        "nodeId", nodeId,
+                        "port", port,
+                        "storageGB", storageGB,
+                        "ramGB", ramGB
+                ));
+            } else {
+                return ResponseEntity.internalServerError()
+                        .body(Map.of("error", "Failed to start node"));
+            }
+
+        } catch (Exception e) {
+            log.error("Failed to start node", e);
+            return ResponseEntity.internalServerError()
+                    .body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    /**
+     * POST /api/network/nodes/stop/{nodeId}
+     * Stops a running node process.
+     */
+    @PostMapping("/nodes/stop/{nodeId}")
+    public ResponseEntity<?> stopNode(@PathVariable String nodeId) {
+        try {
+            log.info("API request: POST /api/network/nodes/stop - nodeId={}", nodeId);
+
+            if (!nodeManagementService.isNodeRunning(nodeId)) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "Node " + nodeId + " is not running"));
+            }
+
+            boolean stopped = nodeManagementService.stopNode(nodeId);
+            
+            if (stopped) {
+                return ResponseEntity.ok(Map.of(
+                        "success", true,
+                        "message", "Node stopped successfully",
+                        "nodeId", nodeId
+                ));
+            } else {
+                return ResponseEntity.internalServerError()
+                        .body(Map.of("error", "Failed to stop node"));
+            }
+
+        } catch (Exception e) {
+            log.error("Failed to stop node", e);
+            return ResponseEntity.internalServerError()
+                    .body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    /**
+     * GET /api/network/nodes/running
+     * Returns list of currently running node processes.
+     */
+    @GetMapping("/nodes/running")
+    public ResponseEntity<Map<String, Object>> getRunningNodes() {
+        log.info("API request: GET /api/network/nodes/running");
+        
+        Set<String> runningNodes = nodeManagementService.getRunningNodes();
+        
+        return ResponseEntity.ok(Map.of(
+                "runningNodes", runningNodes,
+                "count", runningNodes.size()
+        ));
     }
 }

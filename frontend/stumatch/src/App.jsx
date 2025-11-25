@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Server, HardDrive, Activity, Cpu, Network, Terminal, Power, Clock, FileText, Zap, TrendingUp, Database } from 'lucide-react';
+import { Server, HardDrive, Activity, Cpu, Network, Terminal, Power, Clock, FileText, Zap, TrendingUp, Database, Plus, X, Play, Square } from 'lucide-react';
 import './App.css';
 
 /**
@@ -10,10 +10,22 @@ export default function VMDashboard() {
     const [nodes, setNodes] = useState([]);
     const [logs, setLogs] = useState([]);
     const [selectedNode, setSelectedNode] = useState(null);
+    const [showCreateModal, setShowCreateModal] = useState(false);
+    const [runningNodes, setRunningNodes] = useState(new Set());
+    const [newNodeForm, setNewNodeForm] = useState({
+        nodeId: '',
+        port: 50051,
+        storageGB: 100,
+        ramGB: 8
+    });
 
     useEffect(() => {
         fetchNodes();
-        const interval = setInterval(fetchNodes, 2000);
+        fetchRunningNodes();
+        const interval = setInterval(() => {
+            fetchNodes();
+            fetchRunningNodes();
+        }, 2000);
         return () => clearInterval(interval);
     }, []);
 
@@ -31,6 +43,74 @@ export default function VMDashboard() {
     const addLog = (level, message) => {
         const timestamp = new Date().toLocaleTimeString();
         setLogs(prev => [...prev.slice(-50), { timestamp, level, message }]);
+    };
+
+    const fetchRunningNodes = async () => {
+        try {
+            const response = await fetch('http://localhost:8081/api/network/nodes/running');
+            const data = await response.json();
+            setRunningNodes(new Set(data.runningNodes || []));
+        } catch (error) {
+            console.error('Failed to fetch running nodes:', error);
+        }
+    };
+
+    const handleStartNode = async () => {
+        if (!newNodeForm.nodeId || !newNodeForm.nodeId.trim()) {
+            addLog('ERROR', 'Node ID is required');
+            return;
+        }
+
+        try {
+            const response = await fetch('http://localhost:8081/api/network/nodes/start', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(newNodeForm),
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                addLog('SUCCESS', `Node ${newNodeForm.nodeId} started successfully`);
+                setShowCreateModal(false);
+                setNewNodeForm({ nodeId: '', port: 50051, storageGB: 100, ramGB: 8 });
+                // Refresh after a short delay to allow node to initialize
+                setTimeout(() => {
+                    fetchNodes();
+                    fetchRunningNodes();
+                }, 2000);
+            } else {
+                addLog('ERROR', data.error || 'Failed to start node');
+            }
+        } catch (error) {
+            addLog('ERROR', `Failed to start node: ${error.message}`);
+        }
+    };
+
+    const handleStopNode = async (nodeId) => {
+        if (!confirm(`Are you sure you want to stop node ${nodeId}?`)) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`http://localhost:8081/api/network/nodes/stop/${nodeId}`, {
+                method: 'POST',
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                addLog('SUCCESS', `Node ${nodeId} stopped successfully`);
+                fetchNodes();
+                fetchRunningNodes();
+            } else {
+                addLog('ERROR', data.error || 'Failed to stop node');
+            }
+        } catch (error) {
+            addLog('ERROR', `Failed to stop node: ${error.message}`);
+        }
     };
 
     // Simulated node data (in production, fetch from API)
@@ -190,6 +270,13 @@ export default function VMDashboard() {
                         <Server className="section-icon" />
                         <h2>Virtual Nodes</h2>
                         <span className="badge">{mockNodes.length}</span>
+                        <button 
+                            className="add-node-button"
+                            onClick={() => setShowCreateModal(true)}
+                            title="Add New Node"
+                        >
+                            <Plus className="add-icon" />
+                        </button>
                     </div>
                     <div className="nodes-list">
                         {mockNodes.map((node) => {
@@ -205,18 +292,30 @@ export default function VMDashboard() {
                                             <div className="node-name">{node.nodeId.toUpperCase()}</div>
                                             <div className="node-ip">{node.ipAddress}</div>
                                         </div>
-                                        <div className="node-status">
-                                            <div 
-                                                className={`status-dot ${node.alive ? 'alive' : 'dead'}`}
-                                                style={{ backgroundColor: getStateColor(node.state) }}
-                                            />
-                                            <span 
-                                                className="node-state"
-                                                style={{ color: getStateColor(node.state) }}
+                                    <div className="node-status">
+                                        <div 
+                                            className={`status-dot ${node.alive ? 'alive' : 'dead'}`}
+                                            style={{ backgroundColor: getStateColor(node.state) }}
+                                        />
+                                        <span 
+                                            className="node-state"
+                                            style={{ color: getStateColor(node.state) }}
+                                        >
+                                            {node.state}
+                                        </span>
+                                        {runningNodes.has(node.nodeId) && (
+                                            <button
+                                                className="stop-node-button"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleStopNode(node.nodeId);
+                                                }}
+                                                title="Stop Node"
                                             >
-                                                {node.state}
-                                            </span>
-                                        </div>
+                                                <Square className="stop-icon" />
+                                            </button>
+                                        )}
+                                    </div>
                                     </div>
                                     <div className="node-metrics">
                                         <div className="metric">
@@ -560,6 +659,77 @@ export default function VMDashboard() {
                     ))}
                 </div>
             </div>
+
+            {/* Create Node Modal */}
+            {showCreateModal && (
+                <div className="modal-overlay" onClick={() => setShowCreateModal(false)}>
+                    <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h2>Create New Node</h2>
+                            <button 
+                                className="modal-close"
+                                onClick={() => setShowCreateModal(false)}
+                            >
+                                <X />
+                            </button>
+                        </div>
+                        <div className="modal-body">
+                            <div className="form-group">
+                                <label>Node ID</label>
+                                <input
+                                    type="text"
+                                    value={newNodeForm.nodeId}
+                                    onChange={(e) => setNewNodeForm({...newNodeForm, nodeId: e.target.value})}
+                                    placeholder="e.g., node6"
+                                    className="form-input"
+                                />
+                            </div>
+                            <div className="form-group">
+                                <label>Port</label>
+                                <input
+                                    type="number"
+                                    value={newNodeForm.port}
+                                    onChange={(e) => setNewNodeForm({...newNodeForm, port: parseInt(e.target.value) || 50051})}
+                                    className="form-input"
+                                />
+                            </div>
+                            <div className="form-group">
+                                <label>Storage (GB)</label>
+                                <input
+                                    type="number"
+                                    value={newNodeForm.storageGB}
+                                    onChange={(e) => setNewNodeForm({...newNodeForm, storageGB: parseInt(e.target.value) || 100})}
+                                    className="form-input"
+                                />
+                            </div>
+                            <div className="form-group">
+                                <label>RAM (GB)</label>
+                                <input
+                                    type="number"
+                                    value={newNodeForm.ramGB}
+                                    onChange={(e) => setNewNodeForm({...newNodeForm, ramGB: parseInt(e.target.value) || 8})}
+                                    className="form-input"
+                                />
+                            </div>
+                        </div>
+                        <div className="modal-footer">
+                            <button 
+                                className="button-secondary"
+                                onClick={() => setShowCreateModal(false)}
+                            >
+                                Cancel
+                            </button>
+                            <button 
+                                className="button-primary"
+                                onClick={handleStartNode}
+                            >
+                                <Play className="button-icon" />
+                                Start Node
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

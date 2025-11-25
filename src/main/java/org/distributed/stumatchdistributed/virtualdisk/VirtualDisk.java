@@ -75,6 +75,13 @@ public class VirtualDisk {
      * This file represents the entire virtual disk.
      */
     private void createDiskFile() throws IOException {
+        // Ensure the directory exists
+        Path parentDir = diskFilePath.getParent();
+        if (parentDir != null && !Files.exists(parentDir)) {
+            Files.createDirectories(parentDir);
+            log.info("📁 Created directory: {}", parentDir);
+        }
+
         if (!Files.exists(diskFilePath)) {
             // Create the disk file with metadata
             DiskMetadata metadata = new DiskMetadata(diskId, totalSizeBytes);
