@@ -1,6 +1,9 @@
 package org.distributed.stumatchdistributed.web.dto;
 
 
+import lombok.Getter;
+import lombok.Setter;
+
 import java.util.List;
 import java.util.Map;
 
@@ -11,7 +14,10 @@ import java.util.Map;
  * @author Your Name
  * @version 1.0
  */
+@Setter
+@Getter
 public class DistributionResultDTO {
+    // Getters and Setters
     private String fileName;
     private int totalChunks;
     private long totalSizeBytes;
@@ -31,44 +37,4 @@ public class DistributionResultDTO {
         this.nodeToChunks = nodeToChunks;
     }
 
-    // Getters and Setters
-    public String getFileName() {
-        return fileName;
-    }
-
-    public void setFileName(String fileName) {
-        this.fileName = fileName;
-    }
-
-    public int getTotalChunks() {
-        return totalChunks;
-    }
-
-    public void setTotalChunks(int totalChunks) {
-        this.totalChunks = totalChunks;
-    }
-
-    public long getTotalSizeBytes() {
-        return totalSizeBytes;
-    }
-
-    public void setTotalSizeBytes(long totalSizeBytes) {
-        this.totalSizeBytes = totalSizeBytes;
-    }
-
-    public long getDistributionTimeMs() {
-        return distributionTimeMs;
-    }
-
-    public void setDistributionTimeMs(long distributionTimeMs) {
-        this.distributionTimeMs = distributionTimeMs;
-    }
-
-    public Map<String, List<String>> getNodeToChunks() {
-        return nodeToChunks;
-    }
-
-    public void setNodeToChunks(Map<String, List<String>> nodeToChunks) {
-        this.nodeToChunks = nodeToChunks;
-    }
 }

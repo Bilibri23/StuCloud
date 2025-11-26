@@ -25,17 +25,20 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final OtpService otpService;
     private final NotificationService notificationService;
+    private final JwtService jwtService;
 
     public AuthService(UserAccountRepository userAccountRepository,
                        UserStorageService userStorageService,
                        PasswordEncoder passwordEncoder,
                        OtpService otpService,
-                       NotificationService notificationService) {
+                       NotificationService notificationService,
+                       JwtService jwtService) {
         this.userAccountRepository = userAccountRepository;
         this.userStorageService = userStorageService;
         this.passwordEncoder = passwordEncoder;
         this.otpService = otpService;
         this.notificationService = notificationService;
+        this.jwtService = jwtService;
     }
 
     @Transactional
@@ -102,7 +105,8 @@ public class AuthService {
         user.setLastLoginAt(LocalDateTime.now());
         userAccountRepository.save(user);
 
-        return new AuthResponse(true, "OTP verified successfully.");
+        String token = jwtService.generateToken(user.getEmail(), user.getId());
+        return new AuthResponse(true, "OTP verified successfully.", token);
     }
 
 }

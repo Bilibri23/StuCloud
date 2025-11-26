@@ -1,735 +1,553 @@
 import React, { useState, useEffect } from 'react';
-import { Server, HardDrive, Activity, Cpu, Network, Terminal, Power, Clock, FileText, Zap, TrendingUp, Database, Plus, X, Play, Square } from 'lucide-react';
+import { 
+    Upload, Download, Trash2, File, LogOut, User, Lock, Mail, 
+    CheckCircle, XCircle, Loader, Folder, HardDrive, AlertCircle,
+    Eye, EyeOff
+} from 'lucide-react';
 import './App.css';
 
-/**
- * Modern Comprehensive Virtual Machine Dashboard
- * Beautiful, professional design with all functionality
- */
-export default function VMDashboard() {
-    const [nodes, setNodes] = useState([]);
-    const [logs, setLogs] = useState([]);
-    const [selectedNode, setSelectedNode] = useState(null);
-    const [showCreateModal, setShowCreateModal] = useState(false);
-    const [runningNodes, setRunningNodes] = useState(new Set());
-    const [newNodeForm, setNewNodeForm] = useState({
-        nodeId: '',
-        port: 50051,
-        storageGB: 100,
-        ramGB: 8
-    });
+const API_BASE = 'http://localhost:8081/api';
+
+export default function CloudDriveApp() {
+    const [authState, setAuthState] = useState('login'); // 'login' | 'register' | 'otp' | 'authenticated'
+    const [token, setToken] = useState(localStorage.getItem('token'));
+    const [user, setUser] = useState(null);
+    const [files, setFiles] = useState([]);
+    const [storage, setStorage] = useState({ used: 0, total: 1073741824 }); // 1GB default
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
+    const [success, setSuccess] = useState(null);
+    const [showPassword, setShowPassword] = useState(false);
+
+    // Form states
+    const [loginForm, setLoginForm] = useState({ email: '', password: '' });
+    const [registerForm, setRegisterForm] = useState({ fullName: '', email: '', password: '' });
+    const [otpForm, setOtpForm] = useState({ email: '', code: '' });
 
     useEffect(() => {
-        fetchNodes();
-        fetchRunningNodes();
-        const interval = setInterval(() => {
-            fetchNodes();
-            fetchRunningNodes();
-        }, 2000);
-        return () => clearInterval(interval);
-    }, []);
+        if (token) {
+            setAuthState('authenticated');
+            fetchUserData();
+        }
+    }, [token]);
 
-    const fetchNodes = async () => {
+    const fetchUserData = async () => {
         try {
-            const response = await fetch('http://localhost:8081/api/network/nodes');
-            const data = await response.json();
-            setNodes(data);
-            addLog('INFO', `Refreshed ${data.length} node(s)`);
-        } catch (error) {
-            addLog('ERROR', 'Failed to fetch nodes');
+            await Promise.all([fetchFiles(), fetchStorage()]);
+        } catch (err) {
+            console.error('Failed to fetch user data:', err);
         }
     };
 
-    const addLog = (level, message) => {
-        const timestamp = new Date().toLocaleTimeString();
-        setLogs(prev => [...prev.slice(-50), { timestamp, level, message }]);
-    };
-
-    const fetchRunningNodes = async () => {
+    const fetchFiles = async () => {
         try {
-            const response = await fetch('http://localhost:8081/api/network/nodes/running');
-            const data = await response.json();
-            setRunningNodes(new Set(data.runningNodes || []));
-        } catch (error) {
-            console.error('Failed to fetch running nodes:', error);
+            const response = await fetch(`${API_BASE}/files`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (response.ok) {
+                const data = await response.json();
+                setFiles(data);
+            }
+        } catch (err) {
+            console.error('Failed to fetch files:', err);
         }
     };
 
-    const handleStartNode = async () => {
-        if (!newNodeForm.nodeId || !newNodeForm.nodeId.trim()) {
-            addLog('ERROR', 'Node ID is required');
-            return;
-        }
+    const fetchStorage = async () => {
+        // Storage info would come from user endpoint, for now using mock
+        // In real implementation, add GET /api/auth/me endpoint
+        setStorage({ used: 0, total: 1073741824 });
+    };
+
+    const handleRegister = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        setError(null);
 
         try {
-            const response = await fetch('http://localhost:8081/api/network/nodes/start', {
+            const response = await fetch(`${API_BASE}/auth/register`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(newNodeForm),
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(registerForm)
             });
 
             const data = await response.json();
 
             if (response.ok) {
-                addLog('SUCCESS', `Node ${newNodeForm.nodeId} started successfully`);
-                setShowCreateModal(false);
-                setNewNodeForm({ nodeId: '', port: 50051, storageGB: 100, ramGB: 8 });
-                // Refresh after a short delay to allow node to initialize
-                setTimeout(() => {
-                    fetchNodes();
-                    fetchRunningNodes();
-                }, 2000);
+                setSuccess('Registration successful! Check your email for OTP code.');
+                setOtpForm({ ...otpForm, email: registerForm.email });
+                setAuthState('otp');
             } else {
-                addLog('ERROR', data.error || 'Failed to start node');
+                setError(data.error || 'Registration failed');
             }
-        } catch (error) {
-            addLog('ERROR', `Failed to start node: ${error.message}`);
+        } catch (err) {
+            setError('Network error. Please try again.');
+        } finally {
+            setLoading(false);
         }
     };
 
-    const handleStopNode = async (nodeId) => {
-        if (!confirm(`Are you sure you want to stop node ${nodeId}?`)) {
-            return;
-        }
+    const handleLogin = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        setError(null);
 
         try {
-            const response = await fetch(`http://localhost:8081/api/network/nodes/stop/${nodeId}`, {
+            const response = await fetch(`${API_BASE}/auth/login`, {
                 method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(loginForm)
             });
 
             const data = await response.json();
 
             if (response.ok) {
-                addLog('SUCCESS', `Node ${nodeId} stopped successfully`);
-                fetchNodes();
-                fetchRunningNodes();
+                setSuccess('OTP sent to your email!');
+                setOtpForm({ ...otpForm, email: loginForm.email });
+                setAuthState('otp');
             } else {
-                addLog('ERROR', data.error || 'Failed to stop node');
+                setError(data.error || 'Login failed');
             }
-        } catch (error) {
-            addLog('ERROR', `Failed to stop node: ${error.message}`);
+        } catch (err) {
+            setError('Network error. Please try again.');
+        } finally {
+            setLoading(false);
         }
     };
 
-    // Simulated node data (in production, fetch from API)
-    const mockNodes = [
-        {
-            nodeId: 'node1',
-            ipAddress: '192.168.100.10',
-            macAddress: '02:00:00:00:00:0A',
-            port: 50051,
-            state: 'RUNNING',
-            alive: true,
-            uptime: 3600,
-            disk: { used: 2048, total: 102400, files: 15 },
-            processes: [
-                { pid: 1001, name: 'StoreChunk-001', state: 'RUNNING', cpu: 25 },
-                { pid: 1002, name: 'StoreChunk-002', state: 'WAITING', cpu: 0 }
-            ],
-            ram: 8,
-            cpu: 4
-        },
-        {
-            nodeId: 'node2',
-            ipAddress: '192.168.100.11',
-            macAddress: '02:00:00:00:00:0B',
-            port: 50052,
-            state: 'WAITING',
-            alive: true,
-            uptime: 3590,
-            disk: { used: 4096, total: 102400, files: 22 },
-            processes: [],
-            ram: 8,
-            cpu: 4
-        },
-        {
-            nodeId: 'node3',
-            ipAddress: '192.168.100.12',
-            macAddress: '02:00:00:00:00:0C',
-            port: 50053,
-            state: 'RUNNING',
-            alive: true,
-            uptime: 3580,
-            disk: { used: 1024, total: 102400, files: 8 },
-            processes: [
-                { pid: 3001, name: 'StoreChunk-003', state: 'RUNNING', cpu: 45 }
-            ],
-            ram: 8,
-            cpu: 4
-        },
-        {
-            nodeId: 'node4',
-            ipAddress: '192.168.100.13',
-            macAddress: '02:00:00:00:00:0D',
-            port: 50054,
-            state: 'READY',
-            alive: true,
-            uptime: 120,
-            disk: { used: 0, total: 102400, files: 0 },
-            processes: [],
-            ram: 8,
-            cpu: 4
-        },
-        {
-            nodeId: 'node5',
-            ipAddress: '192.168.100.14',
-            macAddress: '02:00:00:00:00:0E',
-            port: 50055,
-            state: 'WAITING',
-            alive: true,
-            uptime: 3600,
-            disk: { used: 3072, total: 102400, files: 18 },
-            processes: [],
-            ram: 8,
-            cpu: 4
+    const handleVerifyOtp = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        setError(null);
+
+        try {
+            const response = await fetch(`${API_BASE}/auth/verify-otp`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(otpForm)
+            });
+
+            const data = await response.json();
+
+            if (response.ok && data.token) {
+                setToken(data.token);
+                localStorage.setItem('token', data.token);
+                setAuthState('authenticated');
+                setSuccess('Login successful!');
+                setTimeout(() => setSuccess(null), 3000);
+                await fetchUserData();
+            } else {
+                setError(data.error || 'Invalid OTP code');
+            }
+        } catch (err) {
+            setError('Network error. Please try again.');
+        } finally {
+            setLoading(false);
         }
-    ];
-
-    const getStateColor = (state) => {
-        const colors = {
-            'CREATED': '#94a3b8',
-            'READY': '#60a5fa',
-            'RUNNING': '#34d399',
-            'WAITING': '#fbbf24',
-            'STOPPED': '#fb923c',
-            'DEAD': '#f87171'
-        };
-        return colors[state] || '#94a3b8';
     };
 
-    const getStateBgColor = (state) => {
-        const colors = {
-            'CREATED': 'rgba(148, 163, 184, 0.1)',
-            'READY': 'rgba(96, 165, 250, 0.1)',
-            'RUNNING': 'rgba(52, 211, 153, 0.1)',
-            'WAITING': 'rgba(251, 191, 36, 0.1)',
-            'STOPPED': 'rgba(251, 146, 60, 0.1)',
-            'DEAD': 'rgba(248, 113, 113, 0.1)'
-        };
-        return colors[state] || 'rgba(148, 163, 184, 0.1)';
+    const handleLogout = () => {
+        setToken(null);
+        localStorage.removeItem('token');
+        setAuthState('login');
+        setUser(null);
+        setFiles([]);
     };
 
-    const formatUptime = (seconds) => {
-        const h = Math.floor(seconds / 3600);
-        const m = Math.floor((seconds % 3600) / 60);
-        const s = seconds % 60;
-        return `${h}h ${m}m ${s}s`;
+    const handleUpload = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        setLoading(true);
+        setError(null);
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            const response = await fetch(`${API_BASE}/files/upload`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` },
+                body: formData
+            });
+
+            if (response.ok) {
+                setSuccess(`File "${file.name}" uploaded successfully!`);
+                setTimeout(() => setSuccess(null), 3000);
+                await fetchFiles();
+                await fetchStorage();
+            } else {
+                const data = await response.json();
+                setError(data.error || 'Upload failed');
+            }
+        } catch (err) {
+            setError('Upload failed. Please try again.');
+        } finally {
+            setLoading(false);
+            e.target.value = ''; // Reset input
+        }
     };
 
-    const totalStorage = mockNodes.reduce((acc, n) => acc + n.disk.used, 0);
-    const totalCapacity = mockNodes.reduce((acc, n) => acc + n.disk.total, 0);
-    const activeNodes = mockNodes.filter(n => n.alive).length;
+    const handleDownload = async (fileId, fileName) => {
+        try {
+            const response = await fetch(`${API_BASE}/files/${fileId}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
 
+            if (response.ok) {
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = fileName;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+            } else {
+                setError('Download failed');
+            }
+        } catch (err) {
+            setError('Download failed. Please try again.');
+        }
+    };
+
+    const handleDelete = async (fileId, fileName) => {
+        if (!confirm(`Are you sure you want to delete "${fileName}"?`)) return;
+
+        setLoading(true);
+        setError(null);
+
+        try {
+            const response = await fetch(`${API_BASE}/files/${fileId}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (response.ok) {
+                setSuccess(`File "${fileName}" deleted successfully!`);
+                setTimeout(() => setSuccess(null), 3000);
+                await fetchFiles();
+                await fetchStorage();
+            } else {
+                setError('Delete failed');
+            }
+        } catch (err) {
+            setError('Delete failed. Please try again.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const formatBytes = (bytes) => {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+    };
+
+    const formatDate = (dateString) => {
+        return new Date(dateString).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    };
+
+    // Auth Views
+    if (authState === 'login') {
+        return (
+            <div className="auth-container">
+                <div className="auth-card">
+                    <div className="auth-header">
+                        <Folder className="auth-logo" />
+                        <h1>Distributed Cloud</h1>
+                        <p>Your personal cloud storage</p>
+                    </div>
+
+                    {error && (
+                        <div className="alert alert-error">
+                            <AlertCircle className="alert-icon" />
+                            {error}
+                        </div>
+                    )}
+
+                    <form onSubmit={handleLogin} className="auth-form">
+                        <div className="form-group">
+                            <Mail className="input-icon" />
+                            <input
+                                type="email"
+                                placeholder="Email address"
+                                value={loginForm.email}
+                                onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })}
+                                required
+                            />
+                        </div>
+
+                        <div className="form-group">
+                            <Lock className="input-icon" />
+                            <input
+                                type={showPassword ? "text" : "password"}
+                                placeholder="Password"
+                                value={loginForm.password}
+                                onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
+                                required
+                            />
+                            <button
+                                type="button"
+                                className="password-toggle"
+                                onClick={() => setShowPassword(!showPassword)}
+                            >
+                                {showPassword ? <EyeOff /> : <Eye />}
+                            </button>
+                        </div>
+
+                        <button type="submit" className="btn btn-primary" disabled={loading}>
+                            {loading ? <Loader className="spinner" /> : 'Sign In'}
+                        </button>
+                    </form>
+
+                    <div className="auth-footer">
+                        <p>Don't have an account? <button onClick={() => setAuthState('register')} className="link">Sign up</button></p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (authState === 'register') {
+        return (
+            <div className="auth-container">
+                <div className="auth-card">
+                    <div className="auth-header">
+                        <Folder className="auth-logo" />
+                        <h1>Create Account</h1>
+                        <p>Get 1GB free storage</p>
+                    </div>
+
+                    {error && (
+                        <div className="alert alert-error">
+                            <AlertCircle className="alert-icon" />
+                            {error}
+                        </div>
+                    )}
+
+                    <form onSubmit={handleRegister} className="auth-form">
+                        <div className="form-group">
+                            <User className="input-icon" />
+                            <input
+                                type="text"
+                                placeholder="Full name"
+                                value={registerForm.fullName}
+                                onChange={(e) => setRegisterForm({ ...registerForm, fullName: e.target.value })}
+                                required
+                            />
+                        </div>
+
+                        <div className="form-group">
+                            <Mail className="input-icon" />
+                            <input
+                                type="email"
+                                placeholder="Email address"
+                                value={registerForm.email}
+                                onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value })}
+                                required
+                            />
+                        </div>
+
+                        <div className="form-group">
+                            <Lock className="input-icon" />
+                            <input
+                                type={showPassword ? "text" : "password"}
+                                placeholder="Password"
+                                value={registerForm.password}
+                                onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })}
+                                required
+                            />
+                            <button
+                                type="button"
+                                className="password-toggle"
+                                onClick={() => setShowPassword(!showPassword)}
+                            >
+                                {showPassword ? <EyeOff /> : <Eye />}
+                            </button>
+                        </div>
+
+                        <button type="submit" className="btn btn-primary" disabled={loading}>
+                            {loading ? <Loader className="spinner" /> : 'Create Account'}
+                        </button>
+                    </form>
+
+                    <div className="auth-footer">
+                        <p>Already have an account? <button onClick={() => setAuthState('login')} className="link">Sign in</button></p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (authState === 'otp') {
+        return (
+            <div className="auth-container">
+                <div className="auth-card">
+                    <div className="auth-header">
+                        <Mail className="auth-logo" />
+                        <h1>Verify Email</h1>
+                        <p>Enter the code sent to {otpForm.email}</p>
+                    </div>
+
+                    {error && (
+                        <div className="alert alert-error">
+                            <AlertCircle className="alert-icon" />
+                            {error}
+                        </div>
+                    )}
+
+                    {success && (
+                        <div className="alert alert-success">
+                            <CheckCircle className="alert-icon" />
+                            {success}
+                        </div>
+                    )}
+
+                    <form onSubmit={handleVerifyOtp} className="auth-form">
+                        <div className="form-group otp-group">
+                            <input
+                                type="text"
+                                placeholder="Enter 6-digit code"
+                                value={otpForm.code}
+                                onChange={(e) => setOtpForm({ ...otpForm, code: e.target.value.replace(/\D/g, '').slice(0, 6) })}
+                                maxLength={6}
+                                required
+                                className="otp-input"
+                            />
+                        </div>
+
+                        <button type="submit" className="btn btn-primary" disabled={loading || otpForm.code.length !== 6}>
+                            {loading ? <Loader className="spinner" /> : 'Verify Code'}
+                        </button>
+                    </form>
+
+                    <div className="auth-footer">
+                        <p>Didn't receive code? <button onClick={() => setAuthState('login')} className="link">Go back</button></p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // Main App (Authenticated)
     return (
-        <div className="dashboard-container">
-            {/* Modern Header */}
-            <header className="dashboard-header">
-                <div className="header-content">
-                    <div className="header-left">
-                        <div className="logo-container">
-                            <Zap className="logo-icon" />
-                        </div>
-                        <div>
-                            <h1 className="dashboard-title">Distributed VM Monitor</h1>
-                            <p className="dashboard-subtitle">Real-time System Monitoring & Management</p>
-                        </div>
+        <div className="app-container">
+            {/* Header */}
+            <header className="app-header">
+                <div className="header-left">
+                    <Folder className="header-logo" />
+                    <h1>Distributed Cloud</h1>
+                </div>
+                <div className="header-right">
+                    <div className="storage-info">
+                        <HardDrive className="storage-icon" />
+                        <span>{formatBytes(storage.used)} / {formatBytes(storage.total)}</span>
                     </div>
-                    <div className="header-stats">
-                        <div className="stat-card-mini">
-                            <Server className="stat-icon" />
-                            <div>
-                                <div className="stat-value">{activeNodes}/{mockNodes.length}</div>
-                                <div className="stat-label">Active Nodes</div>
-                            </div>
-                        </div>
-                        <div className="stat-card-mini">
-                            <Database className="stat-icon" />
-                            <div>
-                                <div className="stat-value">{(totalStorage / 1024).toFixed(1)} GB</div>
-                                <div className="stat-label">Storage Used</div>
-                            </div>
-                        </div>
-                        <div className="stat-card-mini">
-                            <TrendingUp className="stat-icon" />
-                            <div>
-                                <div className="stat-value">{((totalStorage / totalCapacity) * 100).toFixed(1)}%</div>
-                                <div className="stat-label">Capacity</div>
-                            </div>
-                        </div>
-                    </div>
+                    <button onClick={handleLogout} className="btn btn-icon" title="Logout">
+                        <LogOut />
+                    </button>
                 </div>
             </header>
 
-            {/* Main Content */}
-            <div className="dashboard-content">
-                {/* Left Sidebar - Node List */}
-                <aside className="nodes-sidebar">
-                    <div className="section-header">
-                        <Server className="section-icon" />
-                        <h2>Virtual Nodes</h2>
-                        <span className="badge">{mockNodes.length}</span>
-                        <button 
-                            className="add-node-button"
-                            onClick={() => setShowCreateModal(true)}
-                            title="Add New Node"
-                        >
-                            <Plus className="add-icon" />
-                        </button>
-                    </div>
-                    <div className="nodes-list">
-                        {mockNodes.map((node) => {
-                            const diskPercent = (node.disk.used / node.disk.total) * 100;
-                            return (
-                                <div
-                                    key={node.nodeId}
-                                    onClick={() => setSelectedNode(node)}
-                                    className={`node-card ${selectedNode?.nodeId === node.nodeId ? 'selected' : ''}`}
-                                >
-                                    <div className="node-card-header">
-                                        <div className="node-info">
-                                            <div className="node-name">{node.nodeId.toUpperCase()}</div>
-                                            <div className="node-ip">{node.ipAddress}</div>
-                                        </div>
-                                    <div className="node-status">
-                                        <div 
-                                            className={`status-dot ${node.alive ? 'alive' : 'dead'}`}
-                                            style={{ backgroundColor: getStateColor(node.state) }}
-                                        />
-                                        <span 
-                                            className="node-state"
-                                            style={{ color: getStateColor(node.state) }}
-                                        >
-                                            {node.state}
-                                        </span>
-                                        {runningNodes.has(node.nodeId) && (
-                                            <button
-                                                className="stop-node-button"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleStopNode(node.nodeId);
-                                                }}
-                                                title="Stop Node"
-                                            >
-                                                <Square className="stop-icon" />
-                                            </button>
-                                        )}
-                                    </div>
-                                    </div>
-                                    <div className="node-metrics">
-                                        <div className="metric">
-                                            <HardDrive className="metric-icon" />
-                                            <div>
-                                                <div className="metric-value">{diskPercent.toFixed(1)}%</div>
-                                                <div className="metric-label">Disk</div>
-                                            </div>
-                                        </div>
-                                        <div className="metric">
-                                            <Cpu className="metric-icon" />
-                                            <div>
-                                                <div className="metric-value">{node.processes.length}</div>
-                                                <div className="metric-label">Processes</div>
-                                            </div>
-                                        </div>
-                                        <div className="metric">
-                                            <Clock className="metric-icon" />
-                                            <div>
-                                                <div className="metric-value">{Math.floor(node.uptime / 60)}m</div>
-                                                <div className="metric-label">Uptime</div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="disk-bar-container">
-                                        <div 
-                                            className="disk-bar"
-                                            style={{ 
-                                                width: `${diskPercent}%`,
-                                                backgroundColor: diskPercent > 80 ? '#f87171' : diskPercent > 60 ? '#fbbf24' : '#34d399'
-                                            }}
-                                        />
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                </aside>
-
-                {/* Main Panel - Node Details */}
-                <main className="main-panel">
-                    {selectedNode ? (
-                        <div className="node-details">
-                            <div className="details-header">
-                                <div>
-                                    <h2 className="details-title">{selectedNode.nodeId.toUpperCase()}</h2>
-                                    <p className="details-subtitle">Complete Node Information</p>
-                                </div>
-                                <div 
-                                    className="state-badge-large"
-                                    style={{ 
-                                        backgroundColor: getStateBgColor(selectedNode.state),
-                                        color: getStateColor(selectedNode.state)
-                                    }}
-                                >
-                                    {selectedNode.state}
-                                </div>
-                            </div>
-
-                            <div className="details-grid">
-                                {/* Network Interface Card */}
-                                <div className="detail-card">
-                                    <div className="card-header">
-                                        <Network className="card-icon" />
-                                        <h3>Network Interface</h3>
-                                    </div>
-                                    <div className="card-content">
-                                        <div className="info-row">
-                                            <span className="info-label">IP Address</span>
-                                            <span className="info-value">{selectedNode.ipAddress}</span>
-                                        </div>
-                                        <div className="info-row">
-                                            <span className="info-label">MAC Address</span>
-                                            <span className="info-value font-mono">{selectedNode.macAddress}</span>
-                                        </div>
-                                        <div className="info-row">
-                                            <span className="info-label">Port</span>
-                                            <span className="info-value">{selectedNode.port}</span>
-                                        </div>
-                                        <div className="info-row">
-                                            <span className="info-label">Interface</span>
-                                            <span className="info-value">virtual-eth0</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Lifecycle Status Card */}
-                                <div className="detail-card">
-                                    <div className="card-header">
-                                        <Power className="card-icon" />
-                                        <h3>Lifecycle Status</h3>
-                                    </div>
-                                    <div className="card-content">
-                                        <div className="info-row">
-                                            <span className="info-label">State</span>
-                                            <span 
-                                                className="info-value"
-                                                style={{ color: getStateColor(selectedNode.state) }}
-                                            >
-                                                {selectedNode.state}
-                                            </span>
-                                        </div>
-                                        <div className="info-row">
-                                            <span className="info-label">Alive</span>
-                                            <span className="info-value">
-                                                {selectedNode.alive ? (
-                                                    <span className="status-indicator success">✓ YES</span>
-                                                ) : (
-                                                    <span className="status-indicator error">✗ NO</span>
-                                                )}
-                                            </span>
-                                        </div>
-                                        <div className="info-row">
-                                            <span className="info-label">Uptime</span>
-                                            <span className="info-value">{formatUptime(selectedNode.uptime)}</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Virtual Disk Card */}
-                                <div className="detail-card">
-                                    <div className="card-header">
-                                        <HardDrive className="card-icon" />
-                                        <h3>Virtual Disk</h3>
-                                    </div>
-                                    <div className="card-content">
-                                        <div className="disk-stats">
-                                            <div className="disk-stat">
-                                                <div className="disk-stat-value">{(selectedNode.disk.used / 1024).toFixed(2)} GB</div>
-                                                <div className="disk-stat-label">Used</div>
-                                            </div>
-                                            <div className="disk-stat">
-                                                <div className="disk-stat-value">{(selectedNode.disk.total / 1024).toFixed(2)} GB</div>
-                                                <div className="disk-stat-label">Total</div>
-                                            </div>
-                                            <div className="disk-stat">
-                                                <div className="disk-stat-value">{selectedNode.disk.files}</div>
-                                                <div className="disk-stat-label">Files</div>
-                                            </div>
-                                        </div>
-                                        <div className="progress-container">
-                                            <div className="progress-bar">
-                                                <div 
-                                                    className="progress-fill"
-                                                    style={{ 
-                                                        width: `${(selectedNode.disk.used / selectedNode.disk.total) * 100}%`,
-                                                        backgroundColor: (selectedNode.disk.used / selectedNode.disk.total) * 100 > 80 ? '#f87171' : '#34d399'
-                                                    }}
-                                                />
-                                            </div>
-                                            <span className="progress-text">
-                                                {((selectedNode.disk.used / selectedNode.disk.total) * 100).toFixed(1)}% Used
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Processes Card */}
-                                <div className="detail-card full-width">
-                                    <div className="card-header">
-                                        <Cpu className="card-icon" />
-                                        <h3>Active Processes</h3>
-                                        <span className="badge">{selectedNode.processes.length}</span>
-                                    </div>
-                                    <div className="card-content">
-                                        {selectedNode.processes.length > 0 ? (
-                                            <div className="processes-table">
-                                                <div className="table-header">
-                                                    <div className="table-cell">PID</div>
-                                                    <div className="table-cell">Name</div>
-                                                    <div className="table-cell">State</div>
-                                                    <div className="table-cell">CPU %</div>
-                                                </div>
-                                                {selectedNode.processes.map((proc) => (
-                                                    <div key={proc.pid} className="table-row">
-                                                        <div className="table-cell font-mono">{proc.pid}</div>
-                                                        <div className="table-cell">{proc.name}</div>
-                                                        <div className="table-cell">
-                                                            <span 
-                                                                className="process-state"
-                                                                style={{ color: getStateColor(proc.state) }}
-                                                            >
-                                                                {proc.state}
-                                                            </span>
-                                                        </div>
-                                                        <div className="table-cell">
-                                                            <div className="cpu-usage">
-                                                                <div className="cpu-bar">
-                                                                    <div 
-                                                                        className="cpu-fill"
-                                                                        style={{ width: `${proc.cpu}%` }}
-                                                                    />
-                                                                </div>
-                                                                <span>{proc.cpu}%</span>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        ) : (
-                                            <div className="empty-state">
-                                                <Activity className="empty-icon" />
-                                                <p>No active processes</p>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {/* System Resources Card */}
-                                <div className="detail-card">
-                                    <div className="card-header">
-                                        <Activity className="card-icon" />
-                                        <h3>System Resources</h3>
-                                    </div>
-                                    <div className="card-content">
-                                        <div className="resource-item">
-                                            <span className="resource-label">RAM</span>
-                                            <span className="resource-value">{selectedNode.ram} GB</span>
-                                        </div>
-                                        <div className="resource-item">
-                                            <span className="resource-label">CPU Cores</span>
-                                            <span className="resource-value">{selectedNode.cpu}</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="empty-selection">
-                            <Server className="empty-selection-icon" />
-                            <h3>Select a Node</h3>
-                            <p>Choose a node from the sidebar to view detailed information</p>
-                        </div>
-                    )}
-                </main>
-            </div>
-
-            {/* System Logs Panel */}
-            <div className="logs-panel">
-                <div className="section-header">
-                    <Terminal className="section-icon" />
-                    <h2>System Log</h2>
-                </div>
-                <div className="logs-content">
-                    <div className="log-entry">
-                        <span className="log-time">[00:00:00]</span>
-                        <span className="log-level info">INFO</span>
-                        <span className="log-message">SYSTEM BOOT</span>
-                    </div>
-                    <div className="log-entry">
-                        <span className="log-time">[00:00:01]</span>
-                        <span className="log-level info">INFO</span>
-                        <span className="log-message">Network Interface Manager initialized</span>
-                    </div>
-                    <div className="log-entry">
-                        <span className="log-time">[00:00:02]</span>
-                        <span className="log-level info">INFO</span>
-                        <span className="log-message">Virtual Disk subsystem ready</span>
-                    </div>
-                    <div className="log-entry">
-                        <span className="log-time">[00:00:03]</span>
-                        <span className="log-level info">INFO</span>
-                        <span className="log-message">Node1 started (IP: 192.168.100.10)</span>
-                    </div>
-                    <div className="log-entry">
-                        <span className="log-time">[00:00:04]</span>
-                        <span className="log-level info">INFO</span>
-                        <span className="log-message">Node2 started (IP: 192.168.100.11)</span>
-                    </div>
-                    <div className="log-entry">
-                        <span className="log-time">[00:00:05]</span>
-                        <span className="log-level info">INFO</span>
-                        <span className="log-message">Node3 started (IP: 192.168.100.12)</span>
-                    </div>
-                    <div className="log-entry">
-                        <span className="log-time">[00:00:06]</span>
-                        <span className="log-level info">INFO</span>
-                        <span className="log-message">Node4 started (IP: 192.168.100.13)</span>
-                    </div>
-                    <div className="log-entry">
-                        <span className="log-time">[00:00:07]</span>
-                        <span className="log-level info">INFO</span>
-                        <span className="log-message">Node5 started (IP: 192.168.100.14)</span>
-                    </div>
-                    <div className="log-entry">
-                        <span className="log-time">[00:01:00]</span>
-                        <span className="log-level info">INFO</span>
-                        <span className="log-message">File distribution initiated</span>
-                    </div>
-                    <div className="log-entry">
-                        <span className="log-time">[00:01:01]</span>
-                        <span className="log-level success">SUCCESS</span>
-                        <span className="log-message">Chunk 0 → Node1 (RUNNING)</span>
-                    </div>
-                    <div className="log-entry">
-                        <span className="log-time">[00:01:02]</span>
-                        <span className="log-level success">SUCCESS</span>
-                        <span className="log-message">Chunk 1 → Node2 (COMPLETE)</span>
-                    </div>
-                    <div className="log-entry">
-                        <span className="log-time">[00:01:03]</span>
-                        <span className="log-level success">SUCCESS</span>
-                        <span className="log-message">Chunk 2 → Node3 (RUNNING)</span>
-                    </div>
-                    {logs.map((log, i) => (
-                        <div key={i} className="log-entry">
-                            <span className="log-time">[{log.timestamp}]</span>
-                            <span className={`log-level ${log.level.toLowerCase()}`}>{log.level}</span>
-                            <span className="log-message">{log.message}</span>
-                        </div>
-                    ))}
-                </div>
-            </div>
-
-            {/* Network Topology Panel */}
-            <div className="topology-panel">
-                <div className="section-header">
-                    <Network className="section-icon" />
-                    <h2>Network Topology</h2>
-                    <span className="network-subnet">192.168.100.0/24</span>
-                </div>
-                <div className="topology-grid">
-                    {mockNodes.map((node) => (
-                        <div key={node.nodeId} className="topology-node">
-                            <div className="topology-node-icon">
-                                <Server className="topology-server-icon" />
-                                <div 
-                                    className="topology-status-dot"
-                                    style={{ backgroundColor: node.alive ? '#34d399' : '#f87171' }}
-                                />
-                            </div>
-                            <div className="topology-node-name">{node.nodeId.toUpperCase()}</div>
-                            <div className="topology-node-ip">{node.ipAddress}</div>
-                            <div 
-                                className="topology-node-state"
-                                style={{ color: getStateColor(node.state) }}
-                            >
-                                {node.state}
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            </div>
-
-            {/* Create Node Modal */}
-            {showCreateModal && (
-                <div className="modal-overlay" onClick={() => setShowCreateModal(false)}>
-                    <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-                        <div className="modal-header">
-                            <h2>Create New Node</h2>
-                            <button 
-                                className="modal-close"
-                                onClick={() => setShowCreateModal(false)}
-                            >
-                                <X />
-                            </button>
-                        </div>
-                        <div className="modal-body">
-                            <div className="form-group">
-                                <label>Node ID</label>
-                                <input
-                                    type="text"
-                                    value={newNodeForm.nodeId}
-                                    onChange={(e) => setNewNodeForm({...newNodeForm, nodeId: e.target.value})}
-                                    placeholder="e.g., node6"
-                                    className="form-input"
-                                />
-                            </div>
-                            <div className="form-group">
-                                <label>Port</label>
-                                <input
-                                    type="number"
-                                    value={newNodeForm.port}
-                                    onChange={(e) => setNewNodeForm({...newNodeForm, port: parseInt(e.target.value) || 50051})}
-                                    className="form-input"
-                                />
-                            </div>
-                            <div className="form-group">
-                                <label>Storage (GB)</label>
-                                <input
-                                    type="number"
-                                    value={newNodeForm.storageGB}
-                                    onChange={(e) => setNewNodeForm({...newNodeForm, storageGB: parseInt(e.target.value) || 100})}
-                                    className="form-input"
-                                />
-                            </div>
-                            <div className="form-group">
-                                <label>RAM (GB)</label>
-                                <input
-                                    type="number"
-                                    value={newNodeForm.ramGB}
-                                    onChange={(e) => setNewNodeForm({...newNodeForm, ramGB: parseInt(e.target.value) || 8})}
-                                    className="form-input"
-                                />
-                            </div>
-                        </div>
-                        <div className="modal-footer">
-                            <button 
-                                className="button-secondary"
-                                onClick={() => setShowCreateModal(false)}
-                            >
-                                Cancel
-                            </button>
-                            <button 
-                                className="button-primary"
-                                onClick={handleStartNode}
-                            >
-                                <Play className="button-icon" />
-                                Start Node
-                            </button>
-                        </div>
-                    </div>
+            {/* Alerts */}
+            {error && (
+                <div className="alert alert-error alert-top">
+                    <AlertCircle className="alert-icon" />
+                    {error}
+                    <button onClick={() => setError(null)} className="alert-close">×</button>
                 </div>
             )}
+
+            {success && (
+                <div className="alert alert-success alert-top">
+                    <CheckCircle className="alert-icon" />
+                    {success}
+                    <button onClick={() => setSuccess(null)} className="alert-close">×</button>
+                </div>
+            )}
+
+            {/* Main Content */}
+            <main className="app-main">
+                {/* Upload Section */}
+                <div className="upload-section">
+                    <div className="upload-area">
+                        <input
+                            type="file"
+                            id="file-upload"
+                            onChange={handleUpload}
+                            style={{ display: 'none' }}
+                            disabled={loading}
+                        />
+                        <label htmlFor="file-upload" className="upload-label">
+                            <Upload className="upload-icon" />
+                            <span>Click to upload or drag and drop</span>
+                            <small>Max file size: {formatBytes(storage.total - storage.used)} available</small>
+                        </label>
+                    </div>
+                </div>
+
+                {/* Files List */}
+                <div className="files-section">
+                    <div className="section-header">
+                        <h2>My Files</h2>
+                        <span className="file-count">{files.length} {files.length === 1 ? 'file' : 'files'}</span>
+                    </div>
+
+                    {loading && files.length === 0 ? (
+                        <div className="empty-state">
+                            <Loader className="spinner" />
+                            <p>Loading files...</p>
+                        </div>
+                    ) : files.length === 0 ? (
+                        <div className="empty-state">
+                            <File className="empty-icon" />
+                            <p>No files yet. Upload your first file!</p>
+                        </div>
+                    ) : (
+                        <div className="files-grid">
+                            {files.map((file) => (
+                                <div key={file.id} className="file-card">
+                                    <div className="file-icon">
+                                        <File />
+                                    </div>
+                                    <div className="file-info">
+                                        <h3 className="file-name" title={file.fileName}>{file.fileName}</h3>
+                                        <p className="file-meta">
+                                            {formatBytes(file.sizeBytes)} • {formatDate(file.createdAt)}
+                                        </p>
+                                    </div>
+                                    <div className="file-actions">
+                                        <button
+                                            onClick={() => handleDownload(file.id, file.fileName)}
+                                            className="btn-icon btn-download"
+                                            title="Download"
+                                        >
+                                            <Download />
+                                        </button>
+                                        <button
+                                            onClick={() => handleDelete(file.id, file.fileName)}
+                                            className="btn-icon btn-delete"
+                                            title="Delete"
+                                        >
+                                            <Trash2 />
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </main>
         </div>
     );
 }

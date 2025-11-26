@@ -1,6 +1,7 @@
 package org.distributed.stumatchdistributed.storage.service;
 
 import org.distributed.stumatchdistributed.auth.entity.UserAccount;
+import org.distributed.stumatchdistributed.auth.repository.UserAccountRepository;
 import org.distributed.stumatchdistributed.config.StorageProperties;
 import org.distributed.stumatchdistributed.storage.entity.StorageState;
 import org.distributed.stumatchdistributed.storage.entity.UserStorage;
@@ -21,11 +22,14 @@ public class UserStorageService {
     private static final Logger log = LoggerFactory.getLogger(UserStorageService.class);
 
     private final UserStorageRepository userStorageRepository;
+    private final UserAccountRepository userAccountRepository;
     private final StorageProperties storageProperties;
 
     public UserStorageService(UserStorageRepository userStorageRepository,
+                              UserAccountRepository userAccountRepository,
                               StorageProperties storageProperties) {
         this.userStorageRepository = userStorageRepository;
+        this.userAccountRepository = userAccountRepository;
         this.storageProperties = storageProperties;
     }
 
@@ -36,6 +40,21 @@ public class UserStorageService {
     public UserStorage provision(UserAccount user) {
         return userStorageRepository.findByUserId(user.getId())
                 .orElseGet(() -> createStorage(user));
+    }
+
+    public UserStorage getStorage(UserAccount user) {
+        return userStorageRepository.findByUserId(user.getId())
+                .orElseThrow(() -> new IllegalStateException("User storage not provisioned"));
+    }
+
+    public VirtualDisk attachDisk(UserStorage storage) {
+        Path diskPath = Path.of(storage.getDiskPath());
+        Path baseDir = diskPath.getParent();
+        try {
+            return new VirtualDisk(storage.getDiskId(), (int) (storage.getQuotaBytes() / (1024 * 1024 * 1024)), baseDir);
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to attach virtual disk", e);
+        }
     }
 
     private UserStorage createStorage(UserAccount user) {
@@ -79,12 +98,14 @@ public class UserStorageService {
     @Transactional
     public void incrementUsage(UserAccount user, long deltaBytes) {
         user.setUsedStorageBytes(user.getUsedStorageBytes() + deltaBytes);
+        userAccountRepository.save(user);
     }
 
     @Transactional
     public void decrementUsage(UserAccount user, long deltaBytes) {
         long newValue = Math.max(0, user.getUsedStorageBytes() - deltaBytes);
         user.setUsedStorageBytes(newValue);
+        userAccountRepository.save(user);
     }
 }
 
