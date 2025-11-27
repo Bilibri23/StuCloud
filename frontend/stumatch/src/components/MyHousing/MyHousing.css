@@ -1,0 +1,58 @@
+.my-housing {
+    max-width: 1000px;
+    margin: 0 auto;
+}
+
+.housing-info, .roommates-section, .documents-section, .bills-section {
+    background: white;
+    border-radius: 12px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.info-card {
+    background: #f9fafb;
+    padding: 1.5rem;
+    border-radius: 8px;
+    margin-top: 1rem;
+}
+
+.roommates-list, .documents-list, .bills-list {
+    margin-top: 1rem;
+}
+
+.roommate-item, .document-item, .bill-item {
+    padding: 1rem;
+    background: #f9fafb;
+    border-radius: 8px;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.bill-item {
+    justify-content: space-between;
+}
+
+.status-paid {
+    color: #10b981;
+    font-weight: 600;
+}
+
+.status-pending {
+    color: #f59e0b;
+    font-weight: 600;
+}
+
+.btn-upload {
+    margin-top: 1rem;
+    background: #667eea;
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+}

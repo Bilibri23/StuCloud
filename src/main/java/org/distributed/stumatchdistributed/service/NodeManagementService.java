@@ -1,5 +1,6 @@
 package org.distributed.stumatchdistributed.service;
 
+import org.distributed.stumatchdistributed.network.NetworkController;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -21,6 +22,11 @@ public class NodeManagementService {
     private static final Logger log = LoggerFactory.getLogger(NodeManagementService.class);
     
     private final Map<String, Process> runningNodeProcesses = new ConcurrentHashMap<>();
+    private final NetworkController networkController;
+    
+    public NodeManagementService(NetworkController networkController) {
+        this.networkController = networkController;
+    }
     
     /**
      * Starts a new node as a separate Java process.
@@ -89,6 +95,17 @@ public class NodeManagementService {
             log.info("   Port: {}, Storage: {}GB, RAM: {}GB", port, storageGB, ramGB);
             log.info("   Logs: {}", logFile.getAbsolutePath());
             
+            // Wait a bit for node to start gRPC server, then auto-register
+            new Thread(() -> {
+                try {
+                    Thread.sleep(3000); // Wait 3 seconds for node to start
+                    networkController.registerNode(nodeId, "localhost", port);
+                    log.info("✅ Auto-registered node {} with NetworkController", nodeId);
+                } catch (Exception e) {
+                    log.warn("Failed to auto-register node {} (you can register manually via API): {}", nodeId, e.getMessage());
+                }
+            }, "node-register-" + nodeId).start();
+            
             // Monitor process in background
             monitorProcess(nodeId, process);
             
@@ -104,6 +121,9 @@ public class NodeManagementService {
      * Stops a running node process.
      */
     public boolean stopNode(String nodeId) {
+        // Note: We don't unregister from NetworkController here because
+        // the node process will handle its own cleanup when it shuts down
+        
         Process process = runningNodeProcesses.remove(nodeId);
         if (process == null) {
             log.warn("Node {} is not running", nodeId);

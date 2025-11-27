@@ -1,24 +1,44 @@
 import React, { useState, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { 
-    Upload, Download, Trash2, File, LogOut, User, Lock, Mail, 
-    CheckCircle, XCircle, Loader, Folder, HardDrive, AlertCircle,
-    Eye, EyeOff
+    Mail, Lock, User, Eye, EyeOff, Loader, CheckCircle, 
+    AlertCircle, Folder
 } from 'lucide-react';
+
+// Layout
+import Layout from './components/Layout/Layout';
+
+// Pages
+import Dashboard from './components/Dashboard/Dashboard';
+import HousingMarketplace from './components/Housing/HousingMarketplace';
+import RoommateMatching from './components/Roommates/RoommateMatching';
+import MyHousing from './components/MyHousing/MyHousing';
+import NetworkStatus from './components/Admin/NetworkStatus';
+
+// Keep existing file storage component (will extract later)
 import './App.css';
 
 const API_BASE = 'http://localhost:8081/api';
 
-export default function CloudDriveApp() {
-    const [authState, setAuthState] = useState('login'); // 'login' | 'register' | 'otp' | 'authenticated'
+export default function StuCloudApp() {
+    // Auth state
+    const [authState, setAuthState] = useState('login');
     const [token, setToken] = useState(localStorage.getItem('token'));
     const [user, setUser] = useState(null);
+    
+    // Data state
     const [files, setFiles] = useState([]);
-    const [storage, setStorage] = useState({ used: 0, total: 1073741824 }); // 1GB default
+    const [storage, setStorage] = useState({ used: 0, total: 1073741824 });
+    const [networkStatus, setNetworkStatus] = useState(null);
+    const [nodes, setNodes] = useState([]);
+    const [runningNodes, setRunningNodes] = useState([]);
+    
+    // UI state
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [success, setSuccess] = useState(null);
     const [showPassword, setShowPassword] = useState(false);
-
+    
     // Form states
     const [loginForm, setLoginForm] = useState({ email: '', password: '' });
     const [registerForm, setRegisterForm] = useState({ fullName: '', email: '', password: '' });
@@ -28,6 +48,9 @@ export default function CloudDriveApp() {
         if (token) {
             setAuthState('authenticated');
             fetchUserData();
+            fetchNetworkStatus();
+            const interval = setInterval(fetchNetworkStatus, 5000);
+            return () => clearInterval(interval);
         }
     }, [token]);
 
@@ -54,9 +77,26 @@ export default function CloudDriveApp() {
     };
 
     const fetchStorage = async () => {
-        // Storage info would come from user endpoint, for now using mock
-        // In real implementation, add GET /api/auth/me endpoint
         setStorage({ used: 0, total: 1073741824 });
+    };
+
+    const fetchNetworkStatus = async () => {
+        try {
+            const [statusRes, nodesRes, runningRes] = await Promise.all([
+                fetch(`${API_BASE}/network/status`),
+                fetch(`${API_BASE}/network/nodes`),
+                fetch(`${API_BASE}/network/nodes/running`)
+            ]);
+            
+            if (statusRes.ok) setNetworkStatus(await statusRes.json());
+            if (nodesRes.ok) setNodes(await nodesRes.json());
+            if (runningRes.ok) {
+                const data = await runningRes.json();
+                setRunningNodes(Array.isArray(data) ? data : data?.runningNodes || []);
+            }
+        } catch (err) {
+            console.error('Failed to fetch network status:', err);
+        }
     };
 
     const handleRegister = async (e) => {
@@ -154,109 +194,6 @@ export default function CloudDriveApp() {
         setFiles([]);
     };
 
-    const handleUpload = async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        setLoading(true);
-        setError(null);
-
-        const formData = new FormData();
-        formData.append('file', file);
-
-        try {
-            const response = await fetch(`${API_BASE}/files/upload`, {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}` },
-                body: formData
-            });
-
-            if (response.ok) {
-                setSuccess(`File "${file.name}" uploaded successfully!`);
-                setTimeout(() => setSuccess(null), 3000);
-                await fetchFiles();
-                await fetchStorage();
-            } else {
-                const data = await response.json();
-                setError(data.error || 'Upload failed');
-            }
-        } catch (err) {
-            setError('Upload failed. Please try again.');
-        } finally {
-            setLoading(false);
-            e.target.value = ''; // Reset input
-        }
-    };
-
-    const handleDownload = async (fileId, fileName) => {
-        try {
-            const response = await fetch(`${API_BASE}/files/${fileId}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-
-            if (response.ok) {
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = fileName;
-                document.body.appendChild(a);
-                a.click();
-                window.URL.revokeObjectURL(url);
-                document.body.removeChild(a);
-            } else {
-                setError('Download failed');
-            }
-        } catch (err) {
-            setError('Download failed. Please try again.');
-        }
-    };
-
-    const handleDelete = async (fileId, fileName) => {
-        if (!confirm(`Are you sure you want to delete "${fileName}"?`)) return;
-
-        setLoading(true);
-        setError(null);
-
-        try {
-            const response = await fetch(`${API_BASE}/files/${fileId}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-
-            if (response.ok) {
-                setSuccess(`File "${fileName}" deleted successfully!`);
-                setTimeout(() => setSuccess(null), 3000);
-                await fetchFiles();
-                await fetchStorage();
-            } else {
-                setError('Delete failed');
-            }
-        } catch (err) {
-            setError('Delete failed. Please try again.');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const formatBytes = (bytes) => {
-        if (bytes === 0) return '0 Bytes';
-        const k = 1024;
-        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
-    };
-
-    const formatDate = (dateString) => {
-        return new Date(dateString).toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-    };
-
     // Auth Views
     if (authState === 'login') {
         return (
@@ -264,8 +201,8 @@ export default function CloudDriveApp() {
                 <div className="auth-card">
                     <div className="auth-header">
                         <Folder className="auth-logo" />
-                        <h1>Distributed Cloud</h1>
-                        <p>Your personal cloud storage</p>
+                        <h1>StuCloud</h1>
+                        <p>Student Housing & Cloud Storage</p>
                     </div>
 
                     {error && (
@@ -325,7 +262,7 @@ export default function CloudDriveApp() {
                     <div className="auth-header">
                         <Folder className="auth-logo" />
                         <h1>Create Account</h1>
-                        <p>Get 1GB free storage</p>
+                        <p>Join StuCloud today</p>
                     </div>
 
                     {error && (
@@ -441,113 +378,36 @@ export default function CloudDriveApp() {
 
     // Main App (Authenticated)
     return (
-        <div className="app-container">
-            {/* Header */}
-            <header className="app-header">
-                <div className="header-left">
-                    <Folder className="header-logo" />
-                    <h1>Distributed Cloud</h1>
-                </div>
-                <div className="header-right">
-                    <div className="storage-info">
-                        <HardDrive className="storage-icon" />
-                        <span>{formatBytes(storage.used)} / {formatBytes(storage.total)}</span>
-                    </div>
-                    <button onClick={handleLogout} className="btn btn-icon" title="Logout">
-                        <LogOut />
-                    </button>
-                </div>
-            </header>
-
-            {/* Alerts */}
-            {error && (
-                <div className="alert alert-error alert-top">
-                    <AlertCircle className="alert-icon" />
-                    {error}
-                    <button onClick={() => setError(null)} className="alert-close">×</button>
-                </div>
-            )}
-
-            {success && (
-                <div className="alert alert-success alert-top">
-                    <CheckCircle className="alert-icon" />
-                    {success}
-                    <button onClick={() => setSuccess(null)} className="alert-close">×</button>
-                </div>
-            )}
-
-            {/* Main Content */}
-            <main className="app-main">
-                {/* Upload Section */}
-                <div className="upload-section">
-                    <div className="upload-area">
-                        <input
-                            type="file"
-                            id="file-upload"
-                            onChange={handleUpload}
-                            style={{ display: 'none' }}
-                            disabled={loading}
+        <BrowserRouter>
+            <Layout 
+                user={user} 
+                storage={storage} 
+                networkStatus={networkStatus} 
+                onLogout={handleLogout}
+                userRole="student"
+            >
+                <Routes>
+                    <Route path="/" element={
+                        <Dashboard 
+                            files={files} 
+                            networkStatus={networkStatus} 
+                            storage={storage} 
                         />
-                        <label htmlFor="file-upload" className="upload-label">
-                            <Upload className="upload-icon" />
-                            <span>Click to upload or drag and drop</span>
-                            <small>Max file size: {formatBytes(storage.total - storage.used)} available</small>
-                        </label>
-                    </div>
-                </div>
-
-                {/* Files List */}
-                <div className="files-section">
-                    <div className="section-header">
-                        <h2>My Files</h2>
-                        <span className="file-count">{files.length} {files.length === 1 ? 'file' : 'files'}</span>
-                    </div>
-
-                    {loading && files.length === 0 ? (
-                        <div className="empty-state">
-                            <Loader className="spinner" />
-                            <p>Loading files...</p>
-                        </div>
-                    ) : files.length === 0 ? (
-                        <div className="empty-state">
-                            <File className="empty-icon" />
-                            <p>No files yet. Upload your first file!</p>
-                        </div>
-                    ) : (
-                        <div className="files-grid">
-                            {files.map((file) => (
-                                <div key={file.id} className="file-card">
-                                    <div className="file-icon">
-                                        <File />
-                                    </div>
-                                    <div className="file-info">
-                                        <h3 className="file-name" title={file.fileName}>{file.fileName}</h3>
-                                        <p className="file-meta">
-                                            {formatBytes(file.sizeBytes)} • {formatDate(file.createdAt)}
-                                        </p>
-                                    </div>
-                                    <div className="file-actions">
-                                        <button
-                                            onClick={() => handleDownload(file.id, file.fileName)}
-                                            className="btn-icon btn-download"
-                                            title="Download"
-                                        >
-                                            <Download />
-                                        </button>
-                                        <button
-                                            onClick={() => handleDelete(file.id, file.fileName)}
-                                            className="btn-icon btn-delete"
-                                            title="Delete"
-                                        >
-                                            <Trash2 />
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-            </main>
-        </div>
+                    } />
+                    <Route path="/housing" element={<HousingMarketplace />} />
+                    <Route path="/roommates" element={<RoommateMatching />} />
+                    <Route path="/my-housing" element={<MyHousing />} />
+                    <Route path="/files" element={<div><h1>File Storage (Coming Soon)</h1></div>} />
+                    <Route path="/network" element={
+                        <NetworkStatus 
+                            nodes={nodes} 
+                            networkStatus={networkStatus} 
+                        />
+                    } />
+                    <Route path="/admin" element={<div><h1>Admin Panel (Coming Soon)</h1></div>} />
+                    <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+            </Layout>
+        </BrowserRouter>
     );
 }

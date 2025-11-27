@@ -1,5 +1,18 @@
 # StuCloud – Distributed Student Housing and Roommate Matching System  
 
+> **🚀 Quick Start**: See [STARTUP_INSTRUCTIONS.md](STARTUP_INSTRUCTIONS.md) to get the distributed storage working!  
+> **📊 Current Status**: Check [CURRENT_STATUS.md](CURRENT_STATUS.md) for system health and progress.
+
+---
+
+## 🎯 Quick Links
+
+- **[🚀 Startup Instructions](STARTUP_INSTRUCTIONS.md)** - Fix "No distributed nodes available" warning
+- **[📊 Current Status](CURRENT_STATUS.md)** - System health and what's working
+- **[✅ Integration Complete](INTEGRATION_COMPLETE.md)** - Technical integration details
+- **[🔧 Test System](test-system.ps1)** - Run health checks
+- **[⚡ Start Nodes](start-nodes.ps1)** - Auto-start storage nodes
+
 ---
 
 ## 📑 Table of Contents  

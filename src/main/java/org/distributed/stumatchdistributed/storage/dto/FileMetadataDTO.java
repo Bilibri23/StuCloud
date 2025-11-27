@@ -13,6 +13,7 @@ public record FileMetadataDTO(
         long sizeBytes,
         String contentType,
         String storagePath,
+        String storageNodeHint,
         boolean deleted,
         LocalDateTime createdAt,
         LocalDateTime updatedAt
@@ -25,6 +26,7 @@ public record FileMetadataDTO(
                 metadata.getSizeBytes(),
                 metadata.getContentType(),
                 metadata.getStoragePath(),
+                metadata.getStorageNodeHint(),
                 metadata.isDeleted(),
                 metadata.getCreatedAt(),
                 metadata.getUpdatedAt()

@@ -483,6 +483,165 @@
     to { transform: rotate(360deg); }
 }
 
+/* Network Info */
+.network-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: rgba(34, 197, 94, 0.1);
+    border-radius: 8px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #22c55e;
+}
+
+.network-icon {
+    width: 18px;
+    height: 18px;
+}
+
+/* Network Status Panel */
+.network-panel {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    border: 2px solid #e2e8f0;
+}
+
+.panel-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid #e2e8f0;
+}
+
+.panel-icon {
+    width: 24px;
+    height: 24px;
+    color: #667eea;
+}
+
+.panel-header h3 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin: 0;
+    color: #1a202c;
+}
+
+.network-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.stat-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.stat-label {
+    font-size: 0.75rem;
+    color: #718096;
+    font-weight: 500;
+}
+
+.stat-value {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #1a202c;
+}
+
+.nodes-list-mini {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.node-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: rgba(102, 126, 234, 0.1);
+    border: 1px solid rgba(102, 126, 234, 0.2);
+    border-radius: 8px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #667eea;
+}
+
+.node-badge-icon {
+    width: 16px;
+    height: 16px;
+}
+
+/* Distribution Info */
+.distribution-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+    padding: 0.5rem;
+    background: rgba(102, 126, 234, 0.05);
+    border-radius: 6px;
+    font-size: 0.75rem;
+}
+
+.dist-icon {
+    width: 14px;
+    height: 14px;
+    color: #667eea;
+    flex-shrink: 0;
+}
+
+.dist-text {
+    color: #4a5568;
+    font-weight: 500;
+}
+
+/* File Details Expansion */
+.file-details {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid #e2e8f0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.detail-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.detail-label {
+    font-size: 0.875rem;
+    color: #718096;
+    font-weight: 500;
+}
+
+.detail-value {
+    font-size: 0.875rem;
+    color: #1a202c;
+    font-weight: 600;
+    text-align: right;
+    word-break: break-all;
+}
+
+.dist-highlight {
+    color: #667eea;
+    background: rgba(102, 126, 234, 0.1);
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     .app-header {
@@ -493,7 +652,8 @@
         font-size: 1.25rem;
     }
 
-    .storage-info {
+    .storage-info,
+    .network-info {
         display: none;
     }
 
@@ -506,6 +666,10 @@
     }
 
     .files-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .network-stats {
         grid-template-columns: 1fr;
     }
 }
