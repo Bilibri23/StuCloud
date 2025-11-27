@@ -14,8 +14,8 @@ import HousingMarketplace from './components/Housing/HousingMarketplace';
 import RoommateMatching from './components/Roommates/RoommateMatching';
 import MyHousing from './components/MyHousing/MyHousing';
 import NetworkStatus from './components/Admin/NetworkStatus';
+import FileManager from './components/FileStorage/FileManager';
 
-// Keep existing file storage component (will extract later)
 import './App.css';
 
 const API_BASE = 'http://localhost:8081/api';
@@ -397,7 +397,16 @@ export default function StuCloudApp() {
                     <Route path="/housing" element={<HousingMarketplace />} />
                     <Route path="/roommates" element={<RoommateMatching />} />
                     <Route path="/my-housing" element={<MyHousing />} />
-                    <Route path="/files" element={<div><h1>File Storage (Coming Soon)</h1></div>} />
+                    <Route path="/files" element={
+                        <FileManager 
+                            files={files} 
+                            storage={storage}
+                            networkStatus={networkStatus}
+                            nodes={nodes}
+                            token={token}
+                            onRefresh={fetchUserData}
+                        />
+                    } />
                     <Route path="/network" element={
                         <NetworkStatus 
                             nodes={nodes} 
