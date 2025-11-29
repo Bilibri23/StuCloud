@@ -102,9 +102,9 @@ export default function HousingMarketplace() {
                     <div className="filter-group">
                         <label className="filter-label">Price Range</label>
                         <select className="filter-select">
-                            <option>$0 - $100</option>
-                            <option>$100 - $200</option>
-                            <option>$200 - $500</option>
+                            <option>0 - 1000FCFA</option>
+                            <option>100 - 2000FCFA</option>
+                            <option>2000 -5000FCFA</option>
                         </select>
                     </div>
 

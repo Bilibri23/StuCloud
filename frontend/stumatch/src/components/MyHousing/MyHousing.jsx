@@ -12,7 +12,7 @@ export default function MyHousing() {
                 <h2>Current Housing</h2>
                 <div className="info-card">
                     <p><strong>Address:</strong> 123 Campus Road, Apt 2B</p>
-                    <p><strong>Rent:</strong> $120/month (split 2 ways = $60 each)</p>
+                    <p><strong>Rent:</strong> 12000FCFA/month (split 2 ways = 6000FCFA each)</p>
                     <p><strong>Lease:</strong> Jan 2025 - Dec 2025</p>
                 </div>
             </div>
