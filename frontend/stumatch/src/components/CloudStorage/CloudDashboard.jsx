@@ -3,6 +3,7 @@ import {
     HardDrive, Upload, Download, Trash2, Server, 
     Play, Square, RotateCw, X, Activity, File
 } from 'lucide-react';
+import ChunkDistribution from './ChunkDistribution';
 import './CloudDashboard.css';
 
 const API_BASE = 'http://localhost:8081/api';
@@ -16,6 +17,7 @@ export default function CloudDashboard() {
     const [loading, setLoading] = useState(true);
     const [uploading, setUploading] = useState(false);
     const [message, setMessage] = useState(null);
+    const [latestDistribution, setLatestDistribution] = useState(null);
 
     useEffect(() => {
         fetchDashboardData();
@@ -83,7 +85,14 @@ export default function CloudDashboard() {
             });
 
             if (response.ok) {
+                const result = await response.json();
                 showMessage('File uploaded successfully!', 'success');
+                
+                // Fetch chunk distribution for the uploaded file
+                if (result.id) {
+                    fetchFileDistribution(result.id, file.name);
+                }
+                
                 fetchDashboardData();
             } else {
                 showMessage('Upload failed', 'error');
@@ -241,6 +250,25 @@ export default function CloudDashboard() {
         }
     };
 
+    const fetchFileDistribution = async (fileId, fileName) => {
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch(`${API_BASE}/user/dashboard/files/${fileId}/distribution`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (response.ok) {
+                const distribution = await response.json();
+                setLatestDistribution(distribution);
+                
+                // Clear after 10 seconds
+                setTimeout(() => setLatestDistribution(null), 10000);
+            }
+        } catch (error) {
+            console.error('Failed to fetch distribution:', error);
+        }
+    };
+
     const showMessage = (text, type) => {
         setMessage({ text, type });
         setTimeout(() => setMessage(null), 3000);
@@ -326,6 +354,14 @@ export default function CloudDashboard() {
                 </label>
             </div>
 
+            {/* Chunk Distribution Visualization */}
+            {latestDistribution && (
+                <ChunkDistribution 
+                    distribution={latestDistribution.distribution} 
+                    fileName={latestDistribution.fileName}
+                />
+            )}
+
             {/* Files List */}
             <div className="files-section">
                 <h2>My Files ({files.length})</h2>
@@ -339,7 +375,7 @@ export default function CloudDashboard() {
                                     <File size={20} />
                                     <div>
                                         <h4>{file.fileName}</h4>
-                                        <p>{formatBytes(file.fileSize)} • {new Date(file.uploadedAt).toLocaleDateString()}</p>
+                                        <p>{formatBytes(file.sizeBytes)} • {new Date(file.createdAt).toLocaleDateString()}</p>
                                     </div>
                                 </div>
                                 <div className="file-actions">

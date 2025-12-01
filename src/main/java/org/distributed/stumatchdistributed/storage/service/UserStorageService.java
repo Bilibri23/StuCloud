@@ -97,14 +97,27 @@ public class UserStorageService {
 
     @Transactional
     public void incrementUsage(UserAccount user, long deltaBytes) {
+        // Update UserStorage (what the dashboard reads)
+        UserStorage storage = getStorage(user);
+        storage.setUsedBytes(storage.getUsedBytes() + deltaBytes);
+        userStorageRepository.save(storage);
+        
+        // Also update UserAccount for consistency
         user.setUsedStorageBytes(user.getUsedStorageBytes() + deltaBytes);
         userAccountRepository.save(user);
     }
 
     @Transactional
     public void decrementUsage(UserAccount user, long deltaBytes) {
-        long newValue = Math.max(0, user.getUsedStorageBytes() - deltaBytes);
-        user.setUsedStorageBytes(newValue);
+        // Update UserStorage (what the dashboard reads)
+        UserStorage storage = getStorage(user);
+        long newStorageValue = Math.max(0, storage.getUsedBytes() - deltaBytes);
+        storage.setUsedBytes(newStorageValue);
+        userStorageRepository.save(storage);
+        
+        // Also update UserAccount for consistency
+        long newUserValue = Math.max(0, user.getUsedStorageBytes() - deltaBytes);
+        user.setUsedStorageBytes(newUserValue);
         userAccountRepository.save(user);
     }
 }
