@@ -4,6 +4,7 @@ import {
     Play, Square, RotateCw, X, Activity, File
 } from 'lucide-react';
 import ChunkDistribution from './ChunkDistribution';
+import ConfirmModal from './ConfirmModal';
 import './CloudDashboard.css';
 
 const API_BASE = 'http://localhost:8081/api';
@@ -18,6 +19,7 @@ export default function CloudDashboard() {
     const [uploading, setUploading] = useState(false);
     const [message, setMessage] = useState(null);
     const [latestDistribution, setLatestDistribution] = useState(null);
+    const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null, danger: false });
 
     useEffect(() => {
         fetchDashboardData();
@@ -128,9 +130,17 @@ export default function CloudDashboard() {
         }
     };
 
-    const handleDelete = async (fileId, fileName) => {
-        if (!window.confirm(`Delete "${fileName}"?`)) return;
+    const handleDelete = (fileId, fileName) => {
+        setConfirmModal({
+            isOpen: true,
+            title: 'Delete File',
+            message: `Are you sure you want to delete "${fileName}"? This action cannot be undone.`,
+            danger: true,
+            onConfirm: () => deleteFile(fileId)
+        });
+    };
 
+    const deleteFile = async (fileId) => {
         try {
             const token = localStorage.getItem('token');
             const response = await fetch(`${API_BASE}/files/${fileId}`, {
@@ -212,9 +222,17 @@ export default function CloudDashboard() {
         }
     };
 
-    const handleDeleteNode = async (nodeId) => {
-        if (!window.confirm(`Delete node ${nodeId}?`)) return;
+    const handleDeleteNode = (nodeId) => {
+        setConfirmModal({
+            isOpen: true,
+            title: 'Delete Node',
+            message: `Are you sure you want to delete node "${nodeId}"? This will stop the node and remove it from the network.`,
+            danger: true,
+            onConfirm: () => deleteNode(nodeId)
+        });
+    };
 
+    const deleteNode = async (nodeId) => {
         try {
             const token = localStorage.getItem('token');
             const response = await fetch(`${API_BASE}/network/nodes/${nodeId}`, {
@@ -231,10 +249,18 @@ export default function CloudDashboard() {
         }
     };
 
-    const handleDeleteAllNodes = async () => {
-        if (!window.confirm('Stop ALL nodes?')) return;
+    const handleDeleteAllNodes = () => {
+        setConfirmModal({
+            isOpen: true,
+            title: 'Stop All Nodes',
+            message: `Are you sure you want to stop ALL ${nodes.length} nodes? This will halt all distributed storage operations.`,
+            danger: true,
+            onConfirm: () => deleteAllNodes()
+        });
+    };
 
-        try {
+    const deleteAllNodes = async () => {
+        try{
             const token = localStorage.getItem('token');
             const response = await fetch(`${API_BASE}/network/nodes/delete-all`, {
                 method: 'POST',
@@ -286,6 +312,16 @@ export default function CloudDashboard() {
 
     return (
         <div className="cloud-dashboard">
+            {/* Confirmation Modal */}
+            <ConfirmModal
+                isOpen={confirmModal.isOpen}
+                title={confirmModal.title}
+                message={confirmModal.message}
+                onConfirm={confirmModal.onConfirm}
+                onCancel={() => setConfirmModal({ ...confirmModal, isOpen: false })}
+                danger={confirmModal.danger}
+            />
+
             {message && (
                 <div className={`message ${message.type}`}>
                     {message.text}
