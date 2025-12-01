@@ -380,20 +380,7 @@ public class NetworkRestController {
             stats.put("nodeId", nodeId);
             stats.put("isRunning", isRunning);
             stats.put("isRegistered", isRegistered);
-            
-            // Try to get more details from network status
-            Map<String, Object> networkStatus = metricsService.gatherNetworkMetrics();
-            @SuppressWarnings("unchecked")
-            List<Map<String, Object>> nodesList = (List<Map<String, Object>>) networkStatus.get("nodes");
-            
-            if (nodesList != null) {
-                for (Map<String, Object> node : nodesList) {
-                    if (nodeId.equals(node.get("nodeId"))) {
-                        stats.putAll(node);
-                        break;
-                    }
-                }
-            }
+            stats.put("status", isRunning ? "running" : isRegistered ? "registered" : "offline");
             
             return ResponseEntity.ok(stats);
 
@@ -402,12 +389,5 @@ public class NetworkRestController {
             return ResponseEntity.internalServerError()
                     .body(Map.of("error", e.getMessage()));
         }
-    }
-
-    private String formatBytes(long bytes) {
-        if (bytes < 1024) return bytes + " B";
-        if (bytes < 1024 * 1024) return String.format("%.2f KB", bytes / 1024.0);
-        if (bytes < 1024 * 1024 * 1024) return String.format("%.2f MB", bytes / (1024.0 * 1024));
-        return String.format("%.2f GB", bytes / (1024.0 * 1024 * 1024));
     }
 }
