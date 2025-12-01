@@ -53,27 +53,20 @@ public class NetworkRestController {
 
     /**
      * GET /api/network/nodes
-     * Returns list of registered nodes.
+     * Returns list of registered nodes with details including ports.
      *
      * Example response:
      * [
-     *   {"nodeId": "node1", "address": "localhost:50051"},
-     *   {"nodeId": "node2", "address": "localhost:50052"}
+     *   {"nodeId": "node1", "host": "localhost", "port": 50051, "address": "localhost:50051"},
+     *   {"nodeId": "node2", "host": "localhost", "port": 50052, "address": "localhost:50052"}
      * ]
      */
     @GetMapping("/nodes")
-    public ResponseEntity<List<Map<String, String>>> getNodes() {
+    public ResponseEntity<List<Map<String, Object>>> getNodes() {
         log.info("API request: GET /api/network/nodes");
 
-        Set<String> nodeIds = networkController.getRegisteredNodes();
-        List<Map<String, String>> nodes = new ArrayList<>();
-
-        for (String nodeId : nodeIds) {
-            Map<String, String> nodeInfo = new HashMap<>();
-            nodeInfo.put("nodeId", nodeId);
-            // You could add more info here if needed
-            nodes.add(nodeInfo);
-        }
+        Map<String, Map<String, Object>> nodesWithDetails = networkController.getNodesWithDetails();
+        List<Map<String, Object>> nodes = new ArrayList<>(nodesWithDetails.values());
 
         return ResponseEntity.ok(nodes);
     }
@@ -318,9 +311,12 @@ public class NetworkRestController {
                 nodeManagementService.stopNode(nodeId);
             }
             
+            // Unregister from network
+            networkController.unregisterNode(nodeId);
+            
             return ResponseEntity.ok(Map.of(
                     "success", true,
-                    "message", "Node stopped successfully",
+                    "message", "Node deleted successfully",
                     "nodeId", nodeId
             ));
 

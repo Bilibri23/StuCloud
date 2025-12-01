@@ -5,9 +5,15 @@ import {
 } from 'lucide-react';
 import ChunkDistribution from './ChunkDistribution';
 import ConfirmModal from './ConfirmModal';
+import WelcomeMessage from '../WelcomeMessage';
 import './CloudDashboard.css';
 
 const API_BASE = 'http://localhost:8081/api';
+
+// Node configuration - Reduced from 100GB to 5GB for development
+// (100GB was causing "not enough disk space" errors)
+const NODE_STORAGE_GB = 5;  // Change this to allocate more/less storage per node
+const NODE_RAM_GB = 8;
 
 export default function CloudDashboard() {
     const [userDashboard, setUserDashboard] = useState(null);
@@ -20,6 +26,9 @@ export default function CloudDashboard() {
     const [message, setMessage] = useState(null);
     const [latestDistribution, setLatestDistribution] = useState(null);
     const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null, danger: false });
+    const [showWelcome, setShowWelcome] = useState(true);
+    // Node lifecycle states: 'creating' | 'starting' | 'registering' | 'active' | 'failed' | 'offline'
+    const [nodeLifecycleStates, setNodeLifecycleStates] = useState({}); // { nodeId: { state: 'creating', progress: 30, error: null } }
 
     useEffect(() => {
         fetchDashboardData();
@@ -159,7 +168,153 @@ export default function CloudDashboard() {
 
     const handleStartNode = async () => {
         const nodeId = `node${Date.now()}`;
-        const port = 50051 + nodes.length;
+        
+        // Smart port allocation - find next free port
+        const usedPorts = new Set();
+        nodes.forEach(node => {
+            if (node.port) usedPorts.add(node.port);
+        });
+        runningNodes.forEach(nId => {
+            const node = nodes.find(n => n.nodeId === nId);
+            if (node && node.port) usedPorts.add(node.port);
+        });
+        
+        // Find next free port starting from 50051
+        let port = 50051;
+        while (usedPorts.has(port)) {
+            port++;
+        }
+
+        // LIFECYCLE STEP 1: Creating
+        setNodeLifecycleStates(prev => ({
+            ...prev,
+            [nodeId]: { state: 'creating', progress: 10, error: null, port }
+        }));
+        showMessage(`Creating node on port ${port}...`, 'info');
+
+        try {
+            const token = localStorage.getItem('token');
+            
+            // LIFECYCLE STEP 2: Starting
+            setNodeLifecycleStates(prev => ({
+                ...prev,
+                [nodeId]: { state: 'starting', progress: 30, error: null, port }
+            }));
+
+            const response = await fetch(`${API_BASE}/network/nodes/start`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ nodeId, port, storageGB: NODE_STORAGE_GB, ramGB: NODE_RAM_GB })
+            });
+
+            if (response.ok) {
+                // LIFECYCLE STEP 3: Registering
+                setNodeLifecycleStates(prev => ({
+                    ...prev,
+                    [nodeId]: { state: 'registering', progress: 60, error: null, port }
+                }));
+                showMessage(`Node ${nodeId} registering...`, 'success');
+                
+                // Poll for active status
+                let attempts = 0;
+                const maxAttempts = 15; // Give more time
+                const checkInterval = setInterval(async () => {
+                    attempts++;
+                    
+                    // Fetch running nodes directly to avoid stale state
+                    try {
+                        const token = localStorage.getItem('token');
+                        const runningRes = await fetch(`${API_BASE}/network/nodes/running`, {
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        
+                        if (runningRes.ok) {
+                            const data = await runningRes.json();
+                            const activeNodes = data.runningNodes || [];
+                            const isActive = activeNodes.includes(nodeId);
+                            
+                            if (isActive) {
+                                // LIFECYCLE STEP 4: Active!
+                                setNodeLifecycleStates(prev => ({
+                                    ...prev,
+                                    [nodeId]: { state: 'active', progress: 100, error: null, port }
+                                }));
+                                showMessage(`✅ Node ${nodeId} is active!`, 'success');
+                                clearInterval(checkInterval);
+                                
+                                // Refresh full dashboard data
+                                fetchDashboardData();
+                                
+                                // Clear lifecycle state after 3 seconds
+                                setTimeout(() => {
+                                    setNodeLifecycleStates(prev => {
+                                        const newStates = { ...prev };
+                                        delete newStates[nodeId];
+                                        return newStates;
+                                    });
+                                }, 3000);
+                            } else if (attempts >= maxAttempts) {
+                                // Failed to activate
+                                setNodeLifecycleStates(prev => ({
+                                    ...prev,
+                                    [nodeId]: { 
+                                        state: 'failed', 
+                                        progress: 100, 
+                                        error: 'Node did not register within 15 seconds. Check backend logs.',
+                                        port 
+                                    }
+                                }));
+                                showMessage(`⚠️ Node ${nodeId} failed to activate`, 'error');
+                                clearInterval(checkInterval);
+                            } else {
+                                // Still waiting
+                                const progress = 60 + (attempts * 2.5);
+                                setNodeLifecycleStates(prev => ({
+                                    ...prev,
+                                    [nodeId]: { state: 'registering', progress: Math.min(progress, 99), error: null, port }
+                                }));
+                            }
+                        } else {
+                            console.error('Failed to fetch running nodes');
+                        }
+                    } catch (err) {
+                        console.error('Error checking node status:', err);
+                    }
+                }, 1000);
+            } else {
+                const error = await response.json();
+                setNodeLifecycleStates(prev => ({
+                    ...prev,
+                    [nodeId]: { 
+                        state: 'failed', 
+                        progress: 100, 
+                        error: error.message || 'Unknown error',
+                        port 
+                    }
+                }));
+                showMessage(`Failed to create node: ${error.message || 'Unknown error'}`, 'error');
+            }
+        } catch (error) {
+            setNodeLifecycleStates(prev => ({
+                ...prev,
+                [nodeId]: { 
+                    state: 'failed', 
+                    progress: 100, 
+                    error: error.message,
+                    port 
+                }
+            }));
+            showMessage(`Failed to create node: ${error.message}`, 'error');
+        }
+    };
+
+    const handleStartExistingNode = async (nodeId) => {
+        // Find the node's port (assuming it's stored or we can fetch it)
+        const node = nodes.find(n => n.nodeId === nodeId);
+        const port = node?.port || (50051 + nodes.indexOf(node));
 
         try {
             const token = localStorage.getItem('token');
@@ -169,17 +324,17 @@ export default function CloudDashboard() {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
                 },
-                body: JSON.stringify({ nodeId, port, storageGB: 100, ramGB: 8 })
+                body: JSON.stringify({ nodeId, port, storageGB: NODE_STORAGE_GB, ramGB: NODE_RAM_GB })
             });
 
             if (response.ok) {
-                showMessage('Node started successfully!', 'success');
+                showMessage(`Starting ${nodeId}...`, 'success');
                 setTimeout(fetchDashboardData, 3000);
             } else {
-                showMessage('Failed to start node', 'error');
+                showMessage(`Failed to start ${nodeId}`, 'error');
             }
         } catch (error) {
-            showMessage('Failed to start node', 'error');
+            showMessage(`Failed to start ${nodeId}`, 'error');
         }
     };
 
@@ -210,7 +365,7 @@ export default function CloudDashboard() {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
                 },
-                body: JSON.stringify({ port, storageGB: 100, ramGB: 8 })
+                body: JSON.stringify({ port, storageGB: NODE_STORAGE_GB, ramGB: NODE_RAM_GB })
             });
 
             if (response.ok) {
@@ -312,6 +467,15 @@ export default function CloudDashboard() {
 
     return (
         <div className="cloud-dashboard">
+            {/* Welcome Message - Shows on first login */}
+            {showWelcome && (
+                <WelcomeMessage
+                    user={{ email: userDashboard?.userName }}
+                    quota={userDashboard?.totalQuotaBytes}
+                    onClose={() => setShowWelcome(false)}
+                />
+            )}
+
             {/* Confirmation Modal */}
             <ConfirmModal
                 isOpen={confirmModal.isOpen}
@@ -372,10 +536,10 @@ export default function CloudDashboard() {
                         </div>
                     </div>
                     <div className="stat-card">
-                        <Activity size={24} />
+                        <HardDrive size={24} />
                         <div>
-                            <h4>{networkStatus?.totalChunks || 0}</h4>
-                            <p>Chunks</p>
+                            <h4>{nodes.length * NODE_STORAGE_GB} GB</h4>
+                            <p>Total Storage</p>
                         </div>
                     </div>
                 </div>
@@ -442,12 +606,58 @@ export default function CloudDashboard() {
                     </div>
                 </div>
 
-                {nodes.length === 0 ? (
+                {nodes.length === 0 && Object.keys(nodeLifecycleStates).length === 0 ? (
                     <p className="empty-state">No nodes yet. Start your first node!</p>
                 ) : (
                     <div className="nodes-grid">
+                        {/* Show nodes being created/started first */}
+                        {Object.entries(nodeLifecycleStates).map(([nodeId, lifecycle]) => (
+                            <div key={nodeId} className={`node-card ${lifecycle.state}`}>
+                                <div className="node-header">
+                                    <div className="node-title">
+                                        <Server size={20} />
+                                        <h4>{nodeId}</h4>
+                                    </div>
+                                    <span className={`status-badge lifecycle-${lifecycle.state}`}>
+                                        {lifecycle.state === 'creating' && '⚙️ Creating...'}
+                                        {lifecycle.state === 'starting' && '🚀 Starting...'}
+                                        {lifecycle.state === 'registering' && '📡 Registering...'}
+                                        {lifecycle.state === 'active' && '✅ Active'}
+                                        {lifecycle.state === 'failed' && '❌ Failed'}
+                                    </span>
+                                </div>
+                                
+                                {/* Progress Bar */}
+                                <div className="lifecycle-progress">
+                                    <div className="progress-bar">
+                                        <div 
+                                            className={`progress-fill ${lifecycle.state}`}
+                                            style={{ width: `${lifecycle.progress}%` }}
+                                        />
+                                    </div>
+                                    <div className="progress-text">
+                                        <span>Port: {lifecycle.port}</span>
+                                        <span>{lifecycle.progress}%</span>
+                                    </div>
+                                </div>
+
+                                {/* Error Message */}
+                                {lifecycle.error && (
+                                    <div className="lifecycle-error">
+                                        ⚠️ {lifecycle.error}
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+
+                        {/* Show existing nodes */}
                         {nodes.map(node => {
                             const isRunning = runningNodes.includes(node.nodeId);
+                            const inLifecycle = nodeLifecycleStates[node.nodeId];
+                            
+                            // Don't show if in lifecycle state
+                            if (inLifecycle) return null;
+                            
                             return (
                                 <div key={node.nodeId} className={`node-card ${isRunning ? 'running' : 'offline'}`}>
                                     <div className="node-header">
@@ -458,6 +668,9 @@ export default function CloudDashboard() {
                                         <span className={`status-badge ${isRunning ? 'active' : 'inactive'}`}>
                                             {isRunning ? '● Running' : '○ Offline'}
                                         </span>
+                                    </div>
+                                    <div className="node-info">
+                                        <small>Port: {node.port || '—'}</small>
                                     </div>
                                     <div className="node-actions">
                                         {isRunning ? (
@@ -470,7 +683,7 @@ export default function CloudDashboard() {
                                                 </button>
                                             </>
                                         ) : (
-                                            <button onClick={() => handleStartNode()} title="Start">
+                                            <button onClick={() => handleStartExistingNode(node.nodeId)} title="Start">
                                                 <Play size={16} /> Start
                                             </button>
                                         )}

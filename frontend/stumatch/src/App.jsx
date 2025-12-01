@@ -16,6 +16,7 @@ import MyHousing from './components/MyHousing/MyHousing';
 import NetworkStatus from './components/Admin/NetworkStatus';
 import FileManager from './components/FileStorage/FileManager';
 import CloudDashboard from './components/CloudStorage/CloudDashboard';
+import ModularDashboard from './components/ModularDashboard';
 
 import './App.css';
 
@@ -400,6 +401,7 @@ export default function StuCloudApp() {
                     <Route path="/my-housing" element={<MyHousing />} />
                     <Route path="/files" element={<CloudDashboard />} />
                     <Route path="/cloud-storage" element={<CloudDashboard />} />
+                    <Route path="/storage-admin" element={<CloudDashboard />} />
                     <Route path="/network" element={
                         <NetworkStatus 
                             nodes={nodes} 

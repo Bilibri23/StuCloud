@@ -78,3 +78,28 @@
 05:52:21.002 [pool-2-thread-1] INFO org.distributed.stumatchdistributed.node.EnhancedStorageNode -- ║  Files:       2                                  ║
 05:52:21.002 [pool-2-thread-1] INFO org.distributed.stumatchdistributed.node.EnhancedStorageNode -- ╚═══════════════════════════════════════════════════════╝
 05:52:21.002 [pool-2-thread-1] INFO org.distributed.stumatchdistributed.process.ProcessManager -- ✅ Process completed: StoreChunk-7d60e6d3-c869-45a5-b471-dbde2252fd1d_chunk_0 (PID: 1764564741268)
+07:01:01.334 [grpc-default-executor-7] INFO org.distributed.stumatchdistributed.node.EnhancedStorageNode -- ╔═══════════════════════════════════════════════════════╗
+07:01:01.334 [grpc-default-executor-7] INFO org.distributed.stumatchdistributed.node.EnhancedStorageNode -- ║  📥 INCOMING CHUNK STORAGE REQUEST                    ║
+07:01:01.334 [grpc-default-executor-7] INFO org.distributed.stumatchdistributed.node.EnhancedStorageNode -- ╠═══════════════════════════════════════════════════════╣
+07:01:01.345 [grpc-default-executor-7] INFO org.distributed.stumatchdistributed.node.EnhancedStorageNode -- ║  Node:      node1764564474784                                                      ║
+07:01:01.345 [grpc-default-executor-7] INFO org.distributed.stumatchdistributed.node.EnhancedStorageNode -- ║  Chunk ID:  9ffff9b7-8252-48b8-aac2-f46166ee7f43_chunk_0                     ║
+07:01:01.349 [grpc-default-executor-7] INFO org.distributed.stumatchdistributed.node.EnhancedStorageNode -- ║  Size:      33.43 KB                              ║
+07:01:01.349 [grpc-default-executor-7] INFO org.distributed.stumatchdistributed.node.EnhancedStorageNode -- ╚═══════════════════════════════════════════════════════╝
+07:01:01.350 [grpc-default-executor-7] INFO org.distributed.stumatchdistributed.process.ProcessManager -- ➕ Process submitted: StoreChunk-9ffff9b7-8252-48b8-aac2-f46166ee7f43_chunk_0 (PID: 1764568861520)
+07:01:01.350 [grpc-default-executor-7] INFO org.distributed.stumatchdistributed.node.EnhancedStorageNode -- 📋 Process submitted (PID: 1764568861520)
+07:01:01.396 [pool-2-thread-2] INFO org.distributed.stumatchdistributed.process.ProcessManager -- ▶️  Executing process: StoreChunk-9ffff9b7-8252-48b8-aac2-f46166ee7f43_chunk_0 (PID: 1764568861520)
+07:01:01.396 [pool-2-thread-2] INFO org.distributed.stumatchdistributed.node.EnhancedStorageNode -- ⏳ Transferring... [          ]   0%
+07:01:01.399 [pool-2-thread-2] INFO org.distributed.stumatchdistributed.node.EnhancedStorageNode -- ⏳ Transferring... [██        ]  25%
+07:01:01.399 [pool-2-thread-2] INFO org.distributed.stumatchdistributed.node.EnhancedStorageNode -- ⏳ Transferring... [████      ]  50%
+07:01:01.399 [pool-2-thread-2] INFO org.distributed.stumatchdistributed.node.EnhancedStorageNode -- ⏳ Transferring... [███████   ]  75%
+07:01:01.399 [pool-2-thread-2] INFO org.distributed.stumatchdistributed.node.EnhancedStorageNode -- ⏳ Transferring... [██████████] 100%
+07:01:01.416 [pool-2-thread-2] INFO org.distributed.stumatchdistributed.virtualdisk.VirtualDisk -- 💾 File written to disk: 9ffff9b7-8252-48b8-aac2-f46166ee7f43_chunk_0 (34229 bytes)
+07:01:01.416 [pool-2-thread-2] INFO org.distributed.stumatchdistributed.node.EnhancedStorageNode -- ╔═══════════════════════════════════════════════════════╗
+07:01:01.416 [pool-2-thread-2] INFO org.distributed.stumatchdistributed.node.EnhancedStorageNode -- ║  ✅ CHUNK STORED SUCCESSFULLY                         ║
+07:01:01.416 [pool-2-thread-2] INFO org.distributed.stumatchdistributed.node.EnhancedStorageNode -- ╠═══════════════════════════════════════════════════════╣
+07:01:01.416 [pool-2-thread-2] INFO org.distributed.stumatchdistributed.node.EnhancedStorageNode -- ║  Chunk ID:    9ffff9b7-8252-48b8-aac2-f46166ee7f43_chunk_0                   ║
+07:01:01.416 [pool-2-thread-2] INFO org.distributed.stumatchdistributed.node.EnhancedStorageNode -- ║  Duration:    0 ms                         ║
+07:01:01.416 [pool-2-thread-2] INFO org.distributed.stumatchdistributed.node.EnhancedStorageNode -- ║  Disk Used:   0/100 GB                  ║
+07:01:01.416 [pool-2-thread-2] INFO org.distributed.stumatchdistributed.node.EnhancedStorageNode -- ║  Files:       3                                  ║
+07:01:01.420 [pool-2-thread-2] INFO org.distributed.stumatchdistributed.node.EnhancedStorageNode -- ╚═══════════════════════════════════════════════════════╝
+07:01:01.420 [pool-2-thread-2] INFO org.distributed.stumatchdistributed.process.ProcessManager -- ✅ Process completed: StoreChunk-9ffff9b7-8252-48b8-aac2-f46166ee7f43_chunk_0 (PID: 1764568861520)

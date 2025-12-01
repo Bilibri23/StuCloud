@@ -42,6 +42,10 @@ public class NetworkController {
 
     // Registry of connected nodes (thread-safe)
     private final Map<String, NodeConnection> nodes = new HashMap<>();
+    
+    // Track node registration times for grace period
+    private final Map<String, Long> nodeRegistrationTimes = new HashMap<>();
+    private static final long GRACE_PERIOD_MS = 10000; // 10 seconds grace period for new nodes
 
     // Injected services (dependency injection)
     private final FileDecompositionService decompositionService;
@@ -92,20 +96,23 @@ public class NetworkController {
         // Store connection
         NodeConnection connection = new NodeConnection(nodeId, host, port, channel, stub);
         nodes.put(nodeId, connection);
+        
+        // Record registration time for grace period
+        nodeRegistrationTimes.put(nodeId, System.currentTimeMillis());
 
-        log.info("✅ Node registered: {}", nodeId);
+        log.info("✅ Node registered: {} (grace period: {}s)", nodeId, GRACE_PERIOD_MS / 1000);
 
-        // Fetch initial status
-        updateNodeStatus(nodeId);
+        // Give node time to fully initialize before checking status
+        // Don't call updateNodeStatus immediately - let scheduled update handle it
     }
 
     /**
-     * Distributes a file across the network.
+     * Distributes a file across the network with replication for fault tolerance.
      *
      * Process:
      * 1. Decompose file into chunks
      * 2. Select nodes using load balancing
-     * 3. Transfer chunks via gRPC
+     * 3. Transfer chunks via gRPC to MULTIPLE nodes (replication)
      * 4. Track distribution
      *
      * @param filePath Path to file to distribute
@@ -114,8 +121,11 @@ public class NetworkController {
      * @throws Exception if distribution fails
      */
     public ChunkDistribution distributeFile(Path filePath, int chunkSizeMB) throws Exception {
+        final int REPLICATION_FACTOR = 2; // 2x replication for fault tolerance
+        
         log.info("═══════════════════════════════════════════════════════");
         log.info("Starting file distribution: {}", filePath.getFileName());
+        log.info("Replication factor: {}x (fault-tolerant)", REPLICATION_FACTOR);
         log.info("═══════════════════════════════════════════════════════");
 
         // Step 1: Decompose file (delegation to service)
@@ -134,30 +144,50 @@ public class NetworkController {
             throw new IllegalStateException("No nodes available for storage");
         }
 
-        log.info("Distributing across {} nodes", availableNodes.size());
+        // Check if we have enough nodes for replication
+        int effectiveReplicationFactor = Math.min(REPLICATION_FACTOR, availableNodes.size());
+        if (effectiveReplicationFactor < REPLICATION_FACTOR) {
+            log.warn("⚠️ Only {} nodes available. Replication factor reduced to {}x",
+                    availableNodes.size(), effectiveReplicationFactor);
+        }
+
+        log.info("Distributing across {} nodes with {}x replication", 
+                availableNodes.size(), effectiveReplicationFactor);
         log.info("───────────────────────────────────────────────────────");
 
-        // Step 4: Distribute each chunk
+        // Step 4: Distribute each chunk with replication
         long totalTransferTime = 0;
 
         for (int i = 0; i < chunks.size(); i++) {
             FileChunk chunk = chunks.get(i);
+            List<String> selectedNodes = new ArrayList<>();
 
-            // Select target node (delegation to load balancing service)
-            String targetNodeId = loadBalancingService.selectNodeForChunk(availableNodes);
-            NodeConnection targetNode = nodes.get(targetNodeId);
+            log.info("Chunk {}/{}: {} → Replicating to {} nodes...",
+                    i + 1, chunks.size(), chunk.getChunkId(), effectiveReplicationFactor);
 
-            log.info("Chunk {}/{}: {} → {}",
-                    i + 1, chunks.size(), chunk.getChunkId(), targetNodeId);
+            // Replicate chunk to multiple nodes
+            for (int replica = 0; replica < effectiveReplicationFactor; replica++) {
+                // Select a different node for each replica
+                String targetNodeId = selectNodeForReplica(availableNodes, selectedNodes);
+                selectedNodes.add(targetNodeId);
+                
+                NodeConnection targetNode = nodes.get(targetNodeId);
 
-            // Transfer chunk via gRPC
-            long transferTime = transferChunk(targetNode, chunk);
-            totalTransferTime += transferTime;
+                log.info("  Replica {}/{}: {} → {}",
+                        replica + 1, effectiveReplicationFactor, chunk.getChunkId(), targetNodeId);
 
-            // Record distribution
-            distribution.addChunkToNode(targetNodeId, chunk.getChunkId());
+                // Transfer chunk via gRPC
+                long transferTime = transferChunk(targetNode, chunk);
+                totalTransferTime += transferTime;
 
-            log.info("  ✓ Transferred in {} ms", transferTime);
+                // Record distribution
+                distribution.addChunkToNode(targetNodeId, chunk.getChunkId());
+
+                log.info("    ✓ Transferred in {} ms", transferTime);
+            }
+            
+            log.info("  ✅ Chunk {} replicated to {} nodes: {}", 
+                    chunk.getChunkId(), selectedNodes.size(), selectedNodes);
         }
 
         // Step 5: Update all node statuses
@@ -165,9 +195,32 @@ public class NetworkController {
 
         log.info("═══════════════════════════════════════════════════════");
         log.info("Distribution completed in {} ms", totalTransferTime);
+        log.info("Total chunks (including replicas): {}", chunks.size() * effectiveReplicationFactor);
+        log.info("Fault tolerance: Can survive {} node failure(s)", effectiveReplicationFactor - 1);
         log.info("═══════════════════════════════════════════════════════");
 
         return distribution;
+    }
+
+    /**
+     * Selects a node for replica placement that hasn't been used yet for this chunk.
+     *
+     * @param availableNodes All available nodes
+     * @param usedNodes Nodes already selected for this chunk
+     * @return Node ID for replica placement
+     */
+    private String selectNodeForReplica(List<String> availableNodes, List<String> usedNodes) {
+        // Find nodes not yet used for this chunk
+        List<String> candidateNodes = new ArrayList<>(availableNodes);
+        candidateNodes.removeAll(usedNodes);
+        
+        if (candidateNodes.isEmpty()) {
+            // Fallback: if all nodes used, use load balancing on all nodes
+            return loadBalancingService.selectNodeForChunk(availableNodes);
+        }
+        
+        // Use load balancing to select from candidates
+        return loadBalancingService.selectNodeForChunk(candidateNodes);
     }
 
     /**
@@ -231,6 +284,25 @@ public class NetworkController {
             // Update metrics service
             metricsService.updateNodeStatus(status);
 
+        } catch (io.grpc.StatusRuntimeException e) {
+            if (e.getStatus().getCode() == io.grpc.Status.Code.UNAVAILABLE) {
+                // Check if node is within grace period
+                Long registrationTime = nodeRegistrationTimes.get(nodeId);
+                if (registrationTime != null) {
+                    long timeSinceRegistration = System.currentTimeMillis() - registrationTime;
+                    if (timeSinceRegistration < GRACE_PERIOD_MS) {
+                        log.debug("Node {} is UNAVAILABLE but within grace period ({}ms / {}ms)", 
+                                nodeId, timeSinceRegistration, GRACE_PERIOD_MS);
+                        return; // Don't unregister yet, give it more time
+                    }
+                }
+                
+                // Grace period expired or not tracked, unregister
+                log.warn("⚠️ Node {} is UNAVAILABLE - auto-unregistering dead node", nodeId);
+                unregisterNode(nodeId);
+            } else {
+                log.error("Failed to get status from node " + nodeId, e);
+            }
         } catch (Exception e) {
             log.error("Failed to get status from node " + nodeId, e);
         }
@@ -238,9 +310,11 @@ public class NetworkController {
 
     /**
      * Updates status for all registered nodes.
+     * Uses a copy to avoid concurrent modification when dead nodes are removed.
      */
     public void updateAllNodeStatuses() {
-        nodes.keySet().forEach(this::updateNodeStatus);
+        // Create copy to avoid ConcurrentModificationException when unregistering dead nodes
+        new ArrayList<>(nodes.keySet()).forEach(this::updateNodeStatus);
     }
 
     /**
@@ -256,6 +330,55 @@ public class NetworkController {
      */
     public Set<String> getRegisteredNodes() {
         return Collections.unmodifiableSet(nodes.keySet());
+    }
+
+    /**
+     * Gets detailed information for all registered nodes including ports.
+     * @return Map of nodeId to node details (host, port, address)
+     */
+    public Map<String, Map<String, Object>> getNodesWithDetails() {
+        Map<String, Map<String, Object>> nodeDetails = new HashMap<>();
+        for (Map.Entry<String, NodeConnection> entry : nodes.entrySet()) {
+            NodeConnection conn = entry.getValue();
+            Map<String, Object> details = new HashMap<>();
+            details.put("nodeId", conn.getNodeId());
+            details.put("host", conn.getHost());
+            details.put("port", conn.getPort());
+            details.put("address", conn.getAddress());
+            nodeDetails.put(entry.getKey(), details);
+        }
+        return nodeDetails;
+    }
+
+    /**
+     * Unregisters a node from the network.
+     * Closes the gRPC channel and removes the node from registry.
+     *
+     * @param nodeId Node identifier to unregister
+     * @return true if node was unregistered, false if not found
+     */
+    public boolean unregisterNode(String nodeId) {
+        NodeConnection connection = nodes.remove(nodeId);
+        
+        // Clean up registration time tracking
+        nodeRegistrationTimes.remove(nodeId);
+        
+        if (connection == null) {
+            log.warn("Cannot unregister node {} - not found", nodeId);
+            return false;
+        }
+        
+        try {
+            // Shutdown gRPC channel gracefully
+            connection.getChannel().shutdown();
+            connection.getChannel().awaitTermination(5, TimeUnit.SECONDS);
+            log.info("✅ Node unregistered: {}", nodeId);
+            return true;
+        } catch (InterruptedException e) {
+            log.error("Failed to shutdown channel for node {}", nodeId, e);
+            Thread.currentThread().interrupt();
+            return false;
+        }
     }
 
     /**

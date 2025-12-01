@@ -47,7 +47,7 @@ export default function ChunkDistribution({ distribution, fileName }) {
             <div className="distribution-header">
                 <h3>File Distribution</h3>
                 <p className="distribution-subtitle">
-                    {fileName} → {totalChunks} chunks across {nodes.length} nodes
+                    <strong>{fileName}</strong> → <strong>{totalChunks} file chunks</strong> distributed across <strong>{nodes.length} active node{nodes.length > 1 ? 's' : ''}</strong>
                 </p>
             </div>
 
@@ -122,21 +122,21 @@ export default function ChunkDistribution({ distribution, fileName }) {
             {/* Statistics */}
             <div className="distribution-stats">
                 <div className="stat">
-                    <span className="stat-label">Total Chunks</span>
-                    <span className="stat-value">{totalChunks}</span>
+                    <span className="stat-label">File Chunks</span>
+                    <span className="stat-value">{totalChunks} pieces</span>
                 </div>
                 <div className="stat">
-                    <span className="stat-label">Nodes Used</span>
-                    <span className="stat-value">{nodes.length}</span>
+                    <span className="stat-label">Active Nodes</span>
+                    <span className="stat-value">{nodes.length} node{nodes.length > 1 ? 's' : ''}</span>
                 </div>
                 <div className="stat">
-                    <span className="stat-label">Redundancy</span>
+                    <span className="stat-label">Replication</span>
                     <span className="stat-value">
                         {(totalChunks / nodes.length).toFixed(1)}x
                     </span>
                 </div>
                 <div className="stat">
-                    <span className="stat-label">Status</span>
+                    <span className="stat-label">Distribution</span>
                     <span className="stat-value status-complete">
                         {completedChunks.length === totalChunks ? '✓ Complete' : `${completedChunks.length}/${totalChunks}`}
                     </span>
