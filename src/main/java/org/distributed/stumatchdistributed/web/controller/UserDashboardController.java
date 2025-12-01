@@ -37,8 +37,8 @@ public class UserDashboardController {
             log.info("API request: GET /api/user/dashboard");
             
             UserAccount user = userContextService.requireUserByEmail(authentication.getName());
-            UserStorage storage = userStorageService.getStorageByUser(user);
-            List<FileMetadata> files = fileMetadataRepository.findByOwner(user);
+            UserStorage storage = userStorageService.getStorage(user);
+            List<FileMetadata> files = fileMetadataRepository.findByOwnerIdAndDeletedFalseOrderByCreatedAtDesc(user.getId());
 
             Map<String, Object> dashboard = new HashMap<>();
             
@@ -79,7 +79,7 @@ public class UserDashboardController {
             log.info("API request: GET /api/user/dashboard/files");
             
             UserAccount user = userContextService.requireUserByEmail(authentication.getName());
-            List<FileMetadata> files = fileMetadataRepository.findByOwner(user);
+            List<FileMetadata> files = fileMetadataRepository.findByOwnerIdAndDeletedFalseOrderByCreatedAtDesc(user.getId());
 
             return ResponseEntity.ok(files);
         } catch (Exception e) {

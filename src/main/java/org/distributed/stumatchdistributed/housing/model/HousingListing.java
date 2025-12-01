@@ -49,7 +49,6 @@ public class HousingListing {
 
     private String imageUrl;
 
-    @Column(precision = 3, scale = 2)
     private Double rating;
 
     @ManyToOne(fetch = FetchType.EAGER)
