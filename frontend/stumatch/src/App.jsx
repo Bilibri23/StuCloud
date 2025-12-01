@@ -15,6 +15,7 @@ import RoommateMatching from './components/Roommates/RoommateMatching';
 import MyHousing from './components/MyHousing/MyHousing';
 import NetworkStatus from './components/Admin/NetworkStatus';
 import FileManager from './components/FileStorage/FileManager';
+import CloudDashboard from './components/CloudStorage/CloudDashboard';
 
 import './App.css';
 
@@ -397,16 +398,8 @@ export default function StuCloudApp() {
                     <Route path="/housing" element={<HousingMarketplace />} />
                     <Route path="/roommates" element={<RoommateMatching />} />
                     <Route path="/my-housing" element={<MyHousing />} />
-                    <Route path="/files" element={
-                        <FileManager 
-                            files={files} 
-                            storage={storage}
-                            networkStatus={networkStatus}
-                            nodes={nodes}
-                            token={token}
-                            onRefresh={fetchUserData}
-                        />
-                    } />
+                    <Route path="/files" element={<CloudDashboard />} />
+                    <Route path="/cloud-storage" element={<CloudDashboard />} />
                     <Route path="/network" element={
                         <NetworkStatus 
                             nodes={nodes} 
