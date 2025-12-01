@@ -257,4 +257,157 @@ public class NetworkRestController {
                 "count", runningNodes.size()
         ));
     }
+
+    /**
+     * POST /api/network/nodes/restart/{nodeId}
+     * Restarts a node (stops then starts).
+     */
+    @PostMapping("/nodes/restart/{nodeId}")
+    public ResponseEntity<?> restartNode(@PathVariable String nodeId, @RequestBody Map<String, Object> request) {
+        try {
+            log.info("API request: POST /api/network/nodes/restart - nodeId={}", nodeId);
+            
+            Integer port = request.get("port") != null ? 
+                (request.get("port") instanceof Integer ? (Integer) request.get("port") : 
+                 Integer.parseInt(request.get("port").toString())) : 50051;
+            Integer storageGB = request.get("storageGB") != null ?
+                (request.get("storageGB") instanceof Integer ? (Integer) request.get("storageGB") :
+                 Integer.parseInt(request.get("storageGB").toString())) : 100;
+            Integer ramGB = request.get("ramGB") != null ?
+                (request.get("ramGB") instanceof Integer ? (Integer) request.get("ramGB") :
+                 Integer.parseInt(request.get("ramGB").toString())) : 8;
+
+            // Stop if running
+            if (nodeManagementService.isNodeRunning(nodeId)) {
+                nodeManagementService.stopNode(nodeId);
+                Thread.sleep(1000); // Wait for graceful shutdown
+            }
+
+            // Start
+            boolean started = nodeManagementService.startNode(nodeId, port, storageGB, ramGB);
+            
+            if (started) {
+                return ResponseEntity.ok(Map.of(
+                        "success", true,
+                        "message", "Node restarted successfully",
+                        "nodeId", nodeId
+                ));
+            } else {
+                return ResponseEntity.internalServerError()
+                        .body(Map.of("error", "Failed to restart node"));
+            }
+
+        } catch (Exception e) {
+            log.error("Failed to restart node", e);
+            return ResponseEntity.internalServerError()
+                    .body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    /**
+     * DELETE /api/network/nodes/{nodeId}
+     * Deletes a single node (stops and unregisters).
+     */
+    @DeleteMapping("/nodes/{nodeId}")
+    public ResponseEntity<?> deleteNode(@PathVariable String nodeId) {
+        try {
+            log.info("API request: DELETE /api/network/nodes/{}", nodeId);
+            
+            // Stop if running
+            if (nodeManagementService.isNodeRunning(nodeId)) {
+                nodeManagementService.stopNode(nodeId);
+            }
+            
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "Node stopped successfully",
+                    "nodeId", nodeId
+            ));
+
+        } catch (Exception e) {
+            log.error("Failed to delete node", e);
+            return ResponseEntity.internalServerError()
+                    .body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    /**
+     * POST /api/network/nodes/delete-all
+     * Stops all nodes.
+     */
+    @PostMapping("/nodes/delete-all")
+    public ResponseEntity<?> deleteAllNodes() {
+        try {
+            log.info("API request: POST /api/network/nodes/delete-all");
+            
+            Set<String> runningNodes = nodeManagementService.getRunningNodes();
+            
+            // Stop all running nodes
+            int stoppedCount = 0;
+            for (String nodeId : runningNodes) {
+                if (nodeManagementService.stopNode(nodeId)) {
+                    stoppedCount++;
+                }
+            }
+            
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "All nodes stopped successfully",
+                    "stoppedCount", stoppedCount
+            ));
+
+        } catch (Exception e) {
+            log.error("Failed to stop all nodes", e);
+            return ResponseEntity.internalServerError()
+                    .body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    /**
+     * GET /api/network/nodes/{nodeId}/stats
+     * Gets detailed statistics for a specific node.
+     */
+    @GetMapping("/nodes/{nodeId}/stats")
+    public ResponseEntity<?> getNodeStats(@PathVariable String nodeId) {
+        try {
+            log.info("API request: GET /api/network/nodes/{}/stats", nodeId);
+            
+            // Check if node is running and registered
+            boolean isRunning = nodeManagementService.isNodeRunning(nodeId);
+            boolean isRegistered = networkController.getRegisteredNodes().contains(nodeId);
+            
+            Map<String, Object> stats = new HashMap<>();
+            stats.put("nodeId", nodeId);
+            stats.put("isRunning", isRunning);
+            stats.put("isRegistered", isRegistered);
+            
+            // Try to get more details from network status
+            Map<String, Object> networkStatus = metricsService.gatherNetworkMetrics();
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> nodesList = (List<Map<String, Object>>) networkStatus.get("nodes");
+            
+            if (nodesList != null) {
+                for (Map<String, Object> node : nodesList) {
+                    if (nodeId.equals(node.get("nodeId"))) {
+                        stats.putAll(node);
+                        break;
+                    }
+                }
+            }
+            
+            return ResponseEntity.ok(stats);
+
+        } catch (Exception e) {
+            log.error("Failed to get node stats", e);
+            return ResponseEntity.internalServerError()
+                    .body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    private String formatBytes(long bytes) {
+        if (bytes < 1024) return bytes + " B";
+        if (bytes < 1024 * 1024) return String.format("%.2f KB", bytes / 1024.0);
+        if (bytes < 1024 * 1024 * 1024) return String.format("%.2f MB", bytes / (1024.0 * 1024));
+        return String.format("%.2f GB", bytes / (1024.0 * 1024 * 1024));
+    }
 }
