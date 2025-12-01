@@ -30,6 +30,7 @@ public class FileMetadata {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
+    @JsonIgnoreProperties({"password", "otpEnabled", "storageQuotaBytes", "files", "storage"})
     private UserAccount owner;
 
     @Column(nullable = false, length = 255)
